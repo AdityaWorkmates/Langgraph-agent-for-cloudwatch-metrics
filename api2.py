@@ -24,6 +24,9 @@ except Exception:
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.message import add_messages
 
+from flask_cors import CORS
+from dotenv import load_dotenv
+
 
 # MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
@@ -41,16 +44,41 @@ AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", "64000"))
 
+# AWS credentials from environment (if provided)
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
+AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
+
+# LangSmith / LangChain tracing via env vars (automatic if set)
+# Prefer LANGSMITH_* variables from env; map to LANGCHAIN_* expected by LangChain
+if os.getenv("LANGSMITH_API_KEY") and not os.getenv("LANGCHAIN_API_KEY"):
+    os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGSMITH_API_KEY")
+if os.getenv("LANGSMITH_PROJECT") and not os.getenv("LANGCHAIN_PROJECT"):
+    os.environ["LANGCHAIN_PROJECT"] = os.getenv("LANGSMITH_PROJECT")
+if os.getenv("LANGSMITH_ENDPOINT") and not os.getenv("LANGCHAIN_ENDPOINT"):
+    os.environ["LANGCHAIN_ENDPOINT"] = os.getenv("LANGSMITH_ENDPOINT")
+
+# Enable v2 tracing only if an API key is present, unless explicitly configured
+if os.getenv("LANGCHAIN_TRACING_V2") is None and os.getenv("LANGCHAIN_API_KEY"):
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+
 if MODEL_ID is None:
     raise RuntimeError("Set BEDROCK_MODEL_ID environment variable to the Bedrock model id you want to use.")
 
+
+
+load_dotenv()
 # ---------- Flask app ----------
 app = Flask(__name__)
+CORS(app)
+
+
 
 from bedrock_agentcore import BedrockAgentCoreApp
 from bedrock_agentcore.runtime.context import RequestContext
 
-app = BedrockAgentCoreApp()
+
 app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB max upload (tweak as needed)
 
 # ---------- Logging ----------
@@ -312,12 +340,24 @@ if init_chat_model is None:
     raise RuntimeError("langchain not found or import changed; install/adjust langchain before running.")
 
 # Initialize chat model for Bedrock using explicit keyword args
-llm = init_chat_model(
-    model=MODEL_ID,
-    model_provider=MODEL_PROVIDER,
-    region_name=AWS_REGION,
-    temperature=MODEL_TEMPERATURE,
-)
+llm_kwargs = {
+    "model": MODEL_ID,
+    "model_provider": MODEL_PROVIDER,
+    "region_name": AWS_REGION,
+    "temperature": MODEL_TEMPERATURE,
+}
+
+# Pass AWS credentials if present (LangChain AWS forwards these to boto3)
+if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
+    llm_kwargs.update({
+        "aws_access_key_id": AWS_ACCESS_KEY_ID,
+        "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
+        "aws_region": AWS_REGION,
+    })
+    if AWS_SESSION_TOKEN:
+        llm_kwargs["aws_session_token"] = AWS_SESSION_TOKEN
+
+llm = init_chat_model(**llm_kwargs)
 
 # ---------- System prompt enforced schema ----------
 SYSTEM_PROMPT = """
@@ -684,4 +724,4 @@ def analyze():
 
 # ---------- Run app ----------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 6900)), debug=True)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 6000)), debug=True)
