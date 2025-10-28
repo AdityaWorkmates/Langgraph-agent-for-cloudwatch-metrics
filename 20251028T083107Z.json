@@ -1,0 +1,423 @@
+{
+  "instance_id": "i-097bf8bf5e21f9d52",
+  "region": "us-west-2",
+  "metric": {
+    "namespace": "AWS/EC2",
+    "metric_name": "CPUUtilization",
+    "statistic": "Average",
+    "unit": "Percent",
+    "period_seconds": 60
+  },
+  "metric_data_by_range": {
+    "last_5_min": {
+      "lookback_minutes": 5,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T08:26:06Z",
+        "end_iso": "2025-10-28T08:31:06Z"
+      }
+    },
+    "last_10_min": {
+      "lookback_minutes": 10,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T08:21:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    },
+    "last_15_min": {
+      "lookback_minutes": 15,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T08:20:00Z",
+          "value": 78.2667445427945
+        },
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T08:16:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    },
+    "last_30_min": {
+      "lookback_minutes": 30,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T08:05:00Z",
+          "value": 37.1425058000205
+        },
+        {
+          "timestamp": "2025-10-28T08:10:00Z",
+          "value": 52.75469626122398
+        },
+        {
+          "timestamp": "2025-10-28T08:15:00Z",
+          "value": 11.732983099681805
+        },
+        {
+          "timestamp": "2025-10-28T08:20:00Z",
+          "value": 78.2667445427945
+        },
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T08:01:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    },
+    "last_60_min": {
+      "lookback_minutes": 60,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T07:35:00Z",
+          "value": 77.67140642574596
+        },
+        {
+          "timestamp": "2025-10-28T07:40:00Z",
+          "value": 0.18665709176717346
+        },
+        {
+          "timestamp": "2025-10-28T07:45:00Z",
+          "value": 85.29594600662008
+        },
+        {
+          "timestamp": "2025-10-28T07:50:00Z",
+          "value": 53.36552160554872
+        },
+        {
+          "timestamp": "2025-10-28T07:55:00Z",
+          "value": 41.24512633633789
+        },
+        {
+          "timestamp": "2025-10-28T08:00:00Z",
+          "value": 0.26496083466483217
+        },
+        {
+          "timestamp": "2025-10-28T08:05:00Z",
+          "value": 37.1425058000205
+        },
+        {
+          "timestamp": "2025-10-28T08:10:00Z",
+          "value": 52.75469626122398
+        },
+        {
+          "timestamp": "2025-10-28T08:15:00Z",
+          "value": 11.732983099681805
+        },
+        {
+          "timestamp": "2025-10-28T08:20:00Z",
+          "value": 78.2667445427945
+        },
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T07:31:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    },
+    "last_120_min": {
+      "lookback_minutes": 120,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T07:05:00Z",
+          "value": 0.0004632515893455
+        },
+        {
+          "timestamp": "2025-10-28T07:10:00Z",
+          "value": 22.50100865984957
+        },
+        {
+          "timestamp": "2025-10-28T07:15:00Z",
+          "value": 0.5849487086138414
+        },
+        {
+          "timestamp": "2025-10-28T07:20:00Z",
+          "value": 0.22002444636588203
+        },
+        {
+          "timestamp": "2025-10-28T07:25:00Z",
+          "value": 46.02330673052424
+        },
+        {
+          "timestamp": "2025-10-28T07:30:00Z",
+          "value": 56.34671549913281
+        },
+        {
+          "timestamp": "2025-10-28T07:35:00Z",
+          "value": 77.67140642574596
+        },
+        {
+          "timestamp": "2025-10-28T07:40:00Z",
+          "value": 0.18665709176717346
+        },
+        {
+          "timestamp": "2025-10-28T07:45:00Z",
+          "value": 85.29594600662008
+        },
+        {
+          "timestamp": "2025-10-28T07:50:00Z",
+          "value": 53.36552160554872
+        },
+        {
+          "timestamp": "2025-10-28T07:55:00Z",
+          "value": 41.24512633633789
+        },
+        {
+          "timestamp": "2025-10-28T08:00:00Z",
+          "value": 0.26496083466483217
+        },
+        {
+          "timestamp": "2025-10-28T08:05:00Z",
+          "value": 37.1425058000205
+        },
+        {
+          "timestamp": "2025-10-28T08:10:00Z",
+          "value": 52.75469626122398
+        },
+        {
+          "timestamp": "2025-10-28T08:15:00Z",
+          "value": 11.732983099681805
+        },
+        {
+          "timestamp": "2025-10-28T08:20:00Z",
+          "value": 78.2667445427945
+        },
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T06:31:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    },
+    "last_180_min": {
+      "lookback_minutes": 180,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T07:05:00Z",
+          "value": 0.0004632515893455
+        },
+        {
+          "timestamp": "2025-10-28T07:10:00Z",
+          "value": 22.50100865984957
+        },
+        {
+          "timestamp": "2025-10-28T07:15:00Z",
+          "value": 0.5849487086138414
+        },
+        {
+          "timestamp": "2025-10-28T07:20:00Z",
+          "value": 0.22002444636588203
+        },
+        {
+          "timestamp": "2025-10-28T07:25:00Z",
+          "value": 46.02330673052424
+        },
+        {
+          "timestamp": "2025-10-28T07:30:00Z",
+          "value": 56.34671549913281
+        },
+        {
+          "timestamp": "2025-10-28T07:35:00Z",
+          "value": 77.67140642574596
+        },
+        {
+          "timestamp": "2025-10-28T07:40:00Z",
+          "value": 0.18665709176717346
+        },
+        {
+          "timestamp": "2025-10-28T07:45:00Z",
+          "value": 85.29594600662008
+        },
+        {
+          "timestamp": "2025-10-28T07:50:00Z",
+          "value": 53.36552160554872
+        },
+        {
+          "timestamp": "2025-10-28T07:55:00Z",
+          "value": 41.24512633633789
+        },
+        {
+          "timestamp": "2025-10-28T08:00:00Z",
+          "value": 0.26496083466483217
+        },
+        {
+          "timestamp": "2025-10-28T08:05:00Z",
+          "value": 37.1425058000205
+        },
+        {
+          "timestamp": "2025-10-28T08:10:00Z",
+          "value": 52.75469626122398
+        },
+        {
+          "timestamp": "2025-10-28T08:15:00Z",
+          "value": 11.732983099681805
+        },
+        {
+          "timestamp": "2025-10-28T08:20:00Z",
+          "value": 78.2667445427945
+        },
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T05:31:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    },
+    "last_360_min": {
+      "lookback_minutes": 360,
+      "datapoints": [
+        {
+          "timestamp": "2025-10-28T07:05:00Z",
+          "value": 0.0004632515893455
+        },
+        {
+          "timestamp": "2025-10-28T07:10:00Z",
+          "value": 22.50100865984957
+        },
+        {
+          "timestamp": "2025-10-28T07:15:00Z",
+          "value": 0.5849487086138414
+        },
+        {
+          "timestamp": "2025-10-28T07:20:00Z",
+          "value": 0.22002444636588203
+        },
+        {
+          "timestamp": "2025-10-28T07:25:00Z",
+          "value": 46.02330673052424
+        },
+        {
+          "timestamp": "2025-10-28T07:30:00Z",
+          "value": 56.34671549913281
+        },
+        {
+          "timestamp": "2025-10-28T07:35:00Z",
+          "value": 77.67140642574596
+        },
+        {
+          "timestamp": "2025-10-28T07:40:00Z",
+          "value": 0.18665709176717346
+        },
+        {
+          "timestamp": "2025-10-28T07:45:00Z",
+          "value": 85.29594600662008
+        },
+        {
+          "timestamp": "2025-10-28T07:50:00Z",
+          "value": 53.36552160554872
+        },
+        {
+          "timestamp": "2025-10-28T07:55:00Z",
+          "value": 41.24512633633789
+        },
+        {
+          "timestamp": "2025-10-28T08:00:00Z",
+          "value": 0.26496083466483217
+        },
+        {
+          "timestamp": "2025-10-28T08:05:00Z",
+          "value": 37.1425058000205
+        },
+        {
+          "timestamp": "2025-10-28T08:10:00Z",
+          "value": 52.75469626122398
+        },
+        {
+          "timestamp": "2025-10-28T08:15:00Z",
+          "value": 11.732983099681805
+        },
+        {
+          "timestamp": "2025-10-28T08:20:00Z",
+          "value": 78.2667445427945
+        },
+        {
+          "timestamp": "2025-10-28T08:25:00Z",
+          "value": 39.2027651891069
+        },
+        {
+          "timestamp": "2025-10-28T08:30:00Z",
+          "value": 89.6273581761216
+        }
+      ],
+      "query_time_range": {
+        "start_iso": "2025-10-28T02:31:07Z",
+        "end_iso": "2025-10-28T08:31:07Z"
+      }
+    }
+  },
+  "alarm": {
+    "alarm_name": "TEST_CLOUDWATCH_SERVER_TEAM4_CPU#80",
+    "alarm_arn": "arn:aws:cloudwatch:us-west-2:565741009456:alarm:TEST_CLOUDWATCH_SERVER_TEAM4_CPU#80",
+    "state": "ALARM",
+    "state_reason": "Threshold Crossed: 1 out of the last 1 datapoints [89.6273581761216 (28/10/25 08:26:00)] was greater than or equal to the threshold (80.0) (minimum 1 datapoint for OK -> ALARM transition).",
+    "threshold": 80.0,
+    "comparison_operator": "GreaterThanOrEqualToThreshold",
+    "evaluation_periods": 1,
+    "period_seconds": 300,
+    "namespace": "AWS/EC2",
+    "metric_name": "CPUUtilization",
+    "dimensions": [
+      {
+        "Name": "InstanceId",
+        "Value": "i-097bf8bf5e21f9d52"
+      }
+    ],
+    "actions_enabled": true,
+    "alarm_actions": [
+      "arn:aws:lambda:us-west-2:565741009456:function:CLOUDWATCH_TRIGGER_TEAM4",
+      "arn:aws:sns:us-west-2:565741009456:Default_CloudWatch_Alarms_Topic"
+    ],
+    "insufficient_data_actions": [],
+    "ok_actions": []
+  },
+  "generated_at": "2025-10-28T08:31:07Z"
+}
