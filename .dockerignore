@@ -1,0 +1,6 @@
+/cloudwatch_trigger_lambdas/
+/cloudwatch_trigger_lambdas/*
+
+
+/cpu_stress_test/
+/cpu_stress_test/*
