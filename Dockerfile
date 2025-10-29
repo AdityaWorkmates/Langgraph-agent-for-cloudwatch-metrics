@@ -21,9 +21,16 @@ ENV UV_LINK_MODE=copy
 # Copy lock and project metadata files
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies (without dev or project installation)
+# # Install dependencies (without dev or project installation)
+
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
+
+# RUN --mount=type=cache,target=/root/.cache/uv \
+#     uv sync --locked --no-dev
+
+# RUN --mount=type=cache,target=/root/.cache/uv \
+# uv sync --locked --no-dev
 
 # Copy the rest of the application code
 COPY . .
