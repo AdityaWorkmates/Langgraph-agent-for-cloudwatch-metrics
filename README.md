@@ -26,6 +26,14 @@ An AWS Bedrock–powered analysis service built with LangGraph and Flask. It ing
 
 ---
 
+## Architecture Diagram
+
+![Architecture](architecture/architecture.png)
+
+Source (Mermaid): `architecture/architecture.mmd`
+
+---
+
 ## Requirements
 
 - Python 3.12+

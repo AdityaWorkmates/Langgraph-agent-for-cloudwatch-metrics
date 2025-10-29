@@ -1,0 +1,15 @@
+graph TD
+    %% Define CSS-style classes for nodes
+    classDef startEnd fill:#fdf,stroke:#333,stroke-width:2px,font-weight:bold;
+    classDef processing fill:#ccf,stroke:#333,stroke-width:2px;
+
+    %% Nodes
+    A([__start__]) --> B[parse_input];
+    B[parse_input] --> C[analyze_with_llm];
+    C[analyze_with_llm] --> D[generate_plots];
+    D[generate_plots] --> E[format_output];
+    E[format_output] --> F((__end__));
+
+    %% Apply classes to nodes
+    class A,F startEnd;
+    class B,C,D,E processing;
