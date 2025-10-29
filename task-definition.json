@@ -1,0 +1,99 @@
+{
+  "family": "langgraph-backend-task",
+  "containerDefinitions": [
+      {
+          "cpu": 0,
+          "environment": [
+              {
+                  "name": "AWS_REGION",
+                  "value": "us-west-2"
+              },
+              {
+                  "name": "MODEL_TEMPERATURE",
+                  "value": "0.2"
+              },
+              {
+                  "name": "PORT",
+                  "value": "6000"
+              },
+              {
+                  "name": "LANGSMITH_ENDPOINT",
+                  "value": "https://api.smith.langchain.com"
+              },
+              {
+                  "name": "MODEL_MAX_TOKENS",
+                  "value": "64000"
+              },
+              {
+                  "name": "BEDROCK_PROVIDER",
+                  "value": "bedrock_converse"
+              },
+              {
+                  "name": "AWS_SESSION_TOKEN",
+                  "value": ""
+              },
+              {
+                  "name": "MODEL_ID",
+                  "value": "us.anthropic.claude-sonnet-4-20250514-v1:0"
+              },
+              {
+                  "name": "LANGSMITH_TRACING",
+                  "value": "true"
+              },
+              {
+                  "name": "LANGSMITH_PROJECT",
+                  "value": "pr-plaintive-interval-75"
+              },
+              {
+                  "name": "LANGCHAIN_TRACING_V2",
+                  "value": "true"
+              },
+              {
+                  "name": "LOG_LEVEL",
+                  "value": "DEBUG"
+              }
+          ],
+          "essential": true,
+          "healthCheck": {
+              "command": [
+                  "CMD-SHELL",
+                  "curl -f http://localhost:6000/health || exit 1"
+              ],
+              "interval": 30,
+              "retries": 3,
+              "startPeriod": 60,
+              "timeout": 5
+          },
+          "image": "565741009456.dkr.ecr.us-west-2.amazonaws.com/langgraph-backend:latest",
+          "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                  "awslogs-group": "/ecs/langgraph-backend",
+                  "awslogs-region": "us-west-2",
+                  "awslogs-stream-prefix": "ecs"
+              }
+          },
+          "mountPoints": [],
+          "name": "langgraph-backend-container",
+          "portMappings": [
+              {
+                  "containerPort": 6000,
+                  "hostPort": 6000,
+                  "protocol": "tcp"
+              }
+          ],
+          "systemControls": [],
+          "volumesFrom": []
+      }
+  ],
+  "taskRoleArn": "arn:aws:iam::565741009456:role/ecsLanggraphTaskRole",
+  "executionRoleArn": "arn:aws:iam::565741009456:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "volumes": [],
+  "placementConstraints": [],
+  "requiresCompatibilities": [
+      "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024"
+}

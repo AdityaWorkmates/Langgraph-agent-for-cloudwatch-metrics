@@ -352,7 +352,7 @@ if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
     llm_kwargs.update({
         "aws_access_key_id": AWS_ACCESS_KEY_ID,
         "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
-        "aws_region": AWS_REGION,
+        # "aws_region": AWS_REGION,
     })
     if AWS_SESSION_TOKEN:
         llm_kwargs["aws_session_token"] = AWS_SESSION_TOKEN
@@ -645,12 +645,12 @@ def format_output(state: State) -> dict:
 # ---------- Wire nodes into LangGraph ----------
 graph_builder.add_node("parse_input", parse_input)
 graph_builder.add_node("analyze_with_llm", analyze_with_llm)
-graph_builder.add_node("generate_plots", generate_plots)   # <-- new node
+graph_builder.add_node("generate_plots", generate_plots)
 graph_builder.add_node("format_output", format_output)
 
 graph_builder.add_edge(START, "parse_input")
 graph_builder.add_edge("parse_input", "analyze_with_llm")
-graph_builder.add_edge("analyze_with_llm", "generate_plots")  # run plotting after analysis
+graph_builder.add_edge("analyze_with_llm", "generate_plots")
 graph_builder.add_edge("generate_plots", "format_output")
 graph_builder.add_edge("format_output", END)
 
