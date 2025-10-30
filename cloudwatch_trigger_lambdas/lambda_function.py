@@ -20,8 +20,8 @@ ANALYSIS_ENDPOINT = os.getenv(
     "http://langgraph-alb-1133416885.us-west-2.elb.amazonaws.com/analyze"
 )
 # --- SES Configuration ---
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "aditya.d@cloudworkmates.com") # e.g., "analysis-noreply@yourdomain.com"
-RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "debjit.d@cloudworkmates.com") # e.g., "your-team@yourdomain.com"
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "aditya.d@cloudworkmates.com")
+RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "debjit.d@cloudworkmates.com")
 # --- End SES Configuration ---
 
 HTTP = urllib3.PoolManager()

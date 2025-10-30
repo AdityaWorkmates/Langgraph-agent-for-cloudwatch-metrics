@@ -486,7 +486,6 @@ def analyze_with_llm(state: State) -> dict:
     return {"analysis": parsed}
 
 # ---------- new node: generate_plots ----------
-# ---------- new node: generate_plots (improved) ----------
 def generate_plots(state: State) -> dict:
     """
     Look for timestamped series in multiple candidate locations (analysis.raw_findings,
