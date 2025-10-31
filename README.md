@@ -1,4 +1,4 @@
-## new-langraph-agent
+## cloudwatch-langraph-agent
 
 An AWS Bedrock–powered analysis service built with LangGraph and Flask. It ingests CloudWatch-like monitoring payloads and returns a structured, actionable incident analysis. Optional utilities include AWS Lambda handlers that fetch CloudWatch metrics and notify via SNS or SES, plus a CPU stress test script to generate load along with langsmith tracing.
 
