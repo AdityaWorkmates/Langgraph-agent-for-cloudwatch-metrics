@@ -9,16 +9,13 @@ from datetime import datetime, timezone
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
-# Matplotlib headless backend
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# LangChain / LangGraph imports
 try:
     from langchain.chat_models import init_chat_model
 except Exception:
-    # If you use a newer/older langchain, adjust import accordingly.
     init_chat_model = None
 
 from langgraph.graph import StateGraph, START, END
@@ -28,30 +25,20 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 
 
-# MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
-
-
-
-# ---------- Configuration ----------
-MODEL_PROVIDER = os.getenv("BEDROCK_PROVIDER", "bedrock_converse")  # change if needed
-# MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0")
+MODEL_PROVIDER = os.getenv("BEDROCK_PROVIDER", "bedrock_converse")
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
-# Optional model settings you can tune
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 MODEL_MAX_TOKENS = int(os.getenv("MODEL_MAX_TOKENS", "64000"))
 
-# AWS credentials from environment (if provided)
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
 
-# LangSmith / LangChain tracing via env vars (automatic if set)
-# Prefer LANGSMITH_* variables from env; map to LANGCHAIN_* expected by LangChain
 if os.getenv("LANGSMITH_API_KEY") and not os.getenv("LANGCHAIN_API_KEY"):
     os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGSMITH_API_KEY")
 if os.getenv("LANGSMITH_PROJECT") and not os.getenv("LANGCHAIN_PROJECT"):
@@ -59,7 +46,6 @@ if os.getenv("LANGSMITH_PROJECT") and not os.getenv("LANGCHAIN_PROJECT"):
 if os.getenv("LANGSMITH_ENDPOINT") and not os.getenv("LANGCHAIN_ENDPOINT"):
     os.environ["LANGCHAIN_ENDPOINT"] = os.getenv("LANGSMITH_ENDPOINT")
 
-# Enable v2 tracing only if an API key is present, unless explicitly configured
 if os.getenv("LANGCHAIN_TRACING_V2") is None and os.getenv("LANGCHAIN_API_KEY"):
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
 
@@ -69,7 +55,6 @@ if MODEL_ID is None:
 
 
 load_dotenv()
-# ---------- Flask app ----------
 app = Flask(__name__)
 CORS(app)
 
@@ -79,9 +64,8 @@ from bedrock_agentcore import BedrockAgentCoreApp
 from bedrock_agentcore.runtime.context import RequestContext
 
 
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024  # 5 MB max upload (tweak as needed)
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
-# ---------- Logging ----------
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),
@@ -89,7 +73,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("api")
 
-# ---------- Helpers ----------
 def _extract_json_from_text(text: str):
     """Try multiple strategies to extract a single valid JSON object from free-form text.
 
@@ -98,13 +81,10 @@ def _extract_json_from_text(text: str):
     """
     if not text:
         return None
-    # Strategy 1: fenced code blocks
     if "```" in text:
         parts = text.split("```")
-        # code blocks are in odd indices: 1,3,5,...
         for i in range(1, len(parts), 2):
             block = parts[i]
-            # Remove optional language tag on the first line
             if "\n" in block:
                 first_line, rest = block.split("\n", 1)
                 lang = first_line.strip().lower()
@@ -116,7 +96,6 @@ def _extract_json_from_text(text: str):
                 return json.loads(candidate)
             except Exception:
                 continue
-    # Strategy 2: brace matching
     start = text.find("{")
     if start != -1:
         depth = 0
@@ -134,7 +113,6 @@ def _extract_json_from_text(text: str):
                         break
     return None
 
-# Timestamp parsing helper (tries multiple heuristics)
 def _parse_timestamp(value):
     """
     Try numeric (epoch seconds or ms) or ISO-like strings.
@@ -142,13 +120,10 @@ def _parse_timestamp(value):
     """
     if value is None:
         return None
-    # numeric epoch (int/float or numeric string)
     try:
         if isinstance(value, (int, float)):
-            # Heuristic: if value > 1e12 treat as ms
             if value > 1e12:
                 return datetime.fromtimestamp(value / 1000.0, tz=timezone.utc)
-            # if > 1e9 treat as seconds
             if value > 1e9:
                 return datetime.fromtimestamp(value, tz=timezone.utc)
         if isinstance(value, str) and value.isdigit():
@@ -160,10 +135,8 @@ def _parse_timestamp(value):
     except Exception:
         pass
 
-    # try ISO formats and common variants
     if isinstance(value, str):
         s = value.strip()
-        # handle trailing Z
         try:
             if s.endswith("Z"):
                 s2 = s.replace("Z", "+00:00")
@@ -171,7 +144,6 @@ def _parse_timestamp(value):
             return datetime.fromisoformat(s)
         except Exception:
             pass
-        # try common datetime patterns
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
             try:
                 return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
@@ -189,11 +161,10 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
     It tries several common payload shapes:
      - list of dicts with keys like 'timestamp' / 'time' and a numeric value key
      - dict with 'timestamps' and 'values' lists
-     - dict with nested metrics e.g. {'metrics': [{'name':..., 'points': [{'t':..., 'v':...}, ...]}, ...]}
+     - dict with nested metrics e.g. {'metrics': [{'name':..., 'points': [{'t':..., 'v':...}, ...]}, ...]}`
     """
     series = []
 
-    # Case 0: support CloudWatch-style structure with metric_data_by_range
     try:
         if isinstance(payload, dict) and isinstance(payload.get("metric_data_by_range"), dict):
             ranges = payload.get("metric_data_by_range") or {}
@@ -216,10 +187,8 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                     values.append(v)
                 series.append({"name": f"cpu_{range_name}", "times": times, "values": values})
     except Exception:
-        # do not fail plots on extraction errors; other cases will try
         pass
 
-    # Case 1: dict with 'timestamps' and 'values'
     if isinstance(payload, dict):
         if "timestamps" in payload and "values" in payload:
             ts = payload.get("timestamps", [])
@@ -229,13 +198,10 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                 values = [float(v) if _is_number(v) else None for v in vs]
                 series.append({"name": "series", "times": times, "values": values})
 
-    # Case 2: list of dicts (common time series list)
     if isinstance(payload, list) and payload and all(isinstance(x, dict) for x in payload):
-        # try detect timestamp/key names
         ts_keys = ("timestamp", "time", "date", "t", "ts")
         val_keys = None
         for d in payload:
-            # pick numeric key other than timestamp-like
             for k, v in d.items():
                 if k.lower() in ts_keys:
                     continue
@@ -244,7 +210,6 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                     break
             if val_keys:
                 break
-        # build series if possible
         if val_keys:
             times = []
             values = []
@@ -254,9 +219,7 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                     if tk in d:
                         t = _parse_timestamp(d[tk])
                         break
-                # fallback: look for any string that looks like a timestamp
                 if t is None:
-                    # try keys ending with _at or containing date/time
                     for k in d:
                         if "date" in k.lower() or "time" in k.lower() or k.lower().endswith("_at"):
                             t = _parse_timestamp(d[k])
@@ -270,18 +233,15 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                     values.append(None)
             series.append({"name": val_keys, "times": times, "values": values})
 
-    # Case 3: dict with nested metrics
     if isinstance(payload, dict) and "metrics" in payload and isinstance(payload["metrics"], list):
         for m in payload["metrics"]:
             if isinstance(m, dict):
-                # expect m["points"] or m["data"]
                 points = m.get("points") or m.get("data") or m.get("values")
                 if isinstance(points, list) and points:
                     times = []
                     values = []
                     for p in points:
                         if isinstance(p, dict):
-                            # try t/v or timestamp/value
                             t = p.get("t") or p.get("timestamp") or p.get("time") or p.get("date")
                             v = p.get("v") or p.get("value") or p.get("val")
                             times.append(_parse_timestamp(t))
@@ -298,7 +258,6 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                     name = m.get("name") or m.get("metric") or "metric"
                     series.append({"name": name, "times": times, "values": values})
 
-    # Clean series: only keep those with at least 2 non-null points
     cleaned = []
     for s in series:
         pts = [(t, v) for t, v in zip(s.get("times", []), s.get("values", [])) if t is not None and v is not None]
@@ -326,7 +285,6 @@ def _plot_series_to_base64(times: List[datetime], values: List[float], title: st
     b64 = base64.b64encode(buf.read()).decode("ascii")
     return f"data:image/png;base64,{b64}"
 
-# ---------- LangGraph State ----------
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     raw_input: dict
@@ -335,11 +293,9 @@ class State(TypedDict):
 
 graph_builder = StateGraph(State)
 
-# ---------- Init LLM (LangChain -> Bedrock) ----------
 if init_chat_model is None:
     raise RuntimeError("langchain not found or import changed; install/adjust langchain before running.")
 
-# Initialize chat model for Bedrock using explicit keyword args
 llm_kwargs = {
     "model": MODEL_ID,
     "model_provider": MODEL_PROVIDER,
@@ -347,20 +303,17 @@ llm_kwargs = {
     "temperature": MODEL_TEMPERATURE,
 }
 
-# Pass AWS credentials if present (LangChain AWS forwards these to boto3)
 if AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY:
     llm_kwargs.update({
         "aws_access_key_id": AWS_ACCESS_KEY_ID,
         "aws_secret_access_key": AWS_SECRET_ACCESS_KEY,
-        # "aws_region": AWS_REGION,
     })
     if AWS_SESSION_TOKEN:
         llm_kwargs["aws_session_token"] = AWS_SESSION_TOKEN
 
 llm = init_chat_model(**llm_kwargs)
 
-# ---------- System prompt enforced schema ----------
-SYSTEM_PROMPT = """
+SYSTEM_PROMPT = '''
 You are a cloud reliability assistant. You will be given an input JSON payload containing monitoring, metrics, or alarm information.
 The payload structure may vary. Tasks:
 1) Extract key facts (resource id, metric name, timestamps, values, threshold, alarm state, actions).
@@ -388,13 +341,11 @@ RESPONSE_SCHEMA:
   "diagnostics": ["<command1>", "<command2>", ...],
   "raw_findings": { ... }
 }
-"""
+'''
 
-# ---------- parse node ----------
 def parse_input(state: State) -> dict:
     logger.debug("parse_input: start")
     raw = state.get("raw_input") or {}
-    # If messages exist and raw_input empty, try parse JSON from last user message
     if (not raw) and state.get("messages"):
         last = state["messages"][-1]
         if isinstance(last, dict):
@@ -404,7 +355,6 @@ def parse_input(state: State) -> dict:
         try:
             raw = json.loads(content)
         except Exception:
-            # fallback: try to locate a JSON substring
             try:
                 idx = content.index("{")
                 raw = json.loads(content[idx:])
@@ -413,7 +363,6 @@ def parse_input(state: State) -> dict:
     if not isinstance(raw, dict):
         raw = {"value": raw}
     state["raw_input"] = raw
-    # Avoid logging entire payload; log keys only
     try:
         keys = list(raw.keys()) if isinstance(raw, dict) else []
         logger.debug("parse_input: parsed keys=%s", keys[:20])
@@ -421,7 +370,6 @@ def parse_input(state: State) -> dict:
         logger.debug("parse_input: parsed payload (keys unavailable)")
     return {"raw_input": state["raw_input"]}
 
-# ---------- analyze node (calls Bedrock via LangChain) ----------
 def analyze_with_llm(state: State) -> dict:
     logger.debug("analyze_with_llm: start")
     payload = state.get("raw_input", {})
@@ -431,14 +379,11 @@ def analyze_with_llm(state: State) -> dict:
         {"role": "user", "content": user_content}
     ]
 
-    # Try calling common LangChain chat model interfaces
     response_text = None
     try:
         t0 = time.time()
-        # Many LangChain chat models support .invoke(messages) or __call__ or .generate
         if hasattr(llm, "invoke"):
             resp = llm.invoke(messages)
-            # Prefer message.content when available
             if hasattr(resp, "content"):
                 response_text = resp.content
             elif isinstance(resp, dict):
@@ -446,9 +391,7 @@ def analyze_with_llm(state: State) -> dict:
             else:
                 response_text = str(resp)
         else:
-            # fallback to calling llm(messages)
             resp = llm(messages)
-            # resp could be an object with generations
             if hasattr(resp, "content"):
                 response_text = resp.content
             elif isinstance(resp, dict):
@@ -460,18 +403,15 @@ def analyze_with_llm(state: State) -> dict:
         if response_text:
             logger.debug("LLM raw text length=%d", len(response_text))
     except Exception as e:
-        # store error in analysis for observability
         logger.exception("LLM call failed: %s", e)
         state["analysis"] = {"error": str(e), "raw_text": None}
         return {"analysis": state["analysis"]}
 
-    # try to extract JSON from response_text
     parsed = None
     if not response_text:
         parsed = {"raw_text": None}
     else:
         text = response_text.strip()
-        # direct parse, then fenced code/brace-matching fallback
         obj = None
         try:
             obj = json.loads(text)
@@ -485,38 +425,31 @@ def analyze_with_llm(state: State) -> dict:
     logger.debug("analyze_with_llm: parsed=%s", list(parsed.keys()) if isinstance(parsed, dict) else type(parsed).__name__)
     return {"analysis": parsed}
 
-# ---------- new node: generate_plots ----------
 def generate_plots(state: State) -> dict:
     """
     Look for timestamped series in multiple candidate locations (analysis.raw_findings,
     raw_input, and metric_data_by_range) and produce PNG plots.
-    Adds analysis['plots'] = [{'name':..., 'data_uri': 'data:image/png;base64,...'}, ...]
+    Adds analysis['plots'] = [{'name':..., 'data_uri': 'data:image/png;base64,...'}, ...]`
     """
     logger.debug("generate_plots: start (improved)")
     payload = state.get("raw_input") or {}
     analysis = state.get("analysis") or {}
 
-    # Build a list of candidate payloads to scan for time series:
     candidates = []
 
-    # 1) If LLM returned raw_findings, try that first (may contain preprocessed data)
     if isinstance(analysis, dict) and analysis.get("raw_findings"):
         candidates.append(analysis["raw_findings"])
 
-    # 2) Always include the original raw_input payload (where metric_data_by_range usually lives)
     if payload:
         candidates.append(payload)
 
-    # 3) If either place contains metric_data_by_range, explicitly include that dict
     for c in list(candidates):
         if isinstance(c, dict) and c.get("metric_data_by_range"):
             candidates.append(c.get("metric_data_by_range"))
 
-    # Also try nested metric_data_by_range under top-level keys (defensive)
     if isinstance(payload, dict) and payload.get("metric_data_by_range"):
         candidates.append(payload.get("metric_data_by_range"))
 
-    # De-duplicate candidate objects by id() to avoid re-processing exact same object
     uniq_candidates = []
     seen_ids = set()
     for c in candidates:
@@ -537,7 +470,6 @@ def generate_plots(state: State) -> dict:
     except Exception as e:
         logger.exception("generate_plots: extraction loop failure: %s", e)
 
-    # Merge/deduplicate series by (name + length + first/last timestamps) to avoid repeated plots
     merged = []
     seen_keys = set()
     for s in series_found:
@@ -568,7 +500,6 @@ def generate_plots(state: State) -> dict:
             logger.exception("generate_plots: plotting failed for %s: %s", s.get("name"), e)
             continue
 
-    # attach to analysis
     state.setdefault("analysis", {})
     state["analysis"]["plots"] = plots
     logger.debug("generate_plots: created %d plots from %d candidate payloads (series_found=%d, merged=%d)",
@@ -577,13 +508,12 @@ def generate_plots(state: State) -> dict:
 
     """
     Look for timestamped series in raw_input (or analysis.raw_findings) and produce PNG plots.
-    Adds analysis['plots'] = [{'name':..., 'data_uri': 'data:image/png;base64,...'}, ...]
+    Adds analysis['plots'] = [{'name':..., 'data_uri': 'data:image/png;base64,...'}, ...]`
     """
     logger.debug("generate_plots: start")
     payload = state.get("raw_input") or {}
     analysis = state.get("analysis") or {}
 
-    # Prefer raw_findings from analysis if present and looks like data
     candidate_payload = payload
     if isinstance(analysis, dict) and "raw_findings" in analysis and analysis["raw_findings"]:
         candidate_payload = analysis["raw_findings"]
@@ -610,17 +540,14 @@ def generate_plots(state: State) -> dict:
             logger.exception("generate_plots: plotting failed for %s: %s", s.get("name"), e)
             continue
 
-    # attach to analysis
     state.setdefault("analysis", {})
     state["analysis"]["plots"] = plots
     logger.debug("generate_plots: created %d plots", len(plots))
     return {"analysis": state["analysis"]}
 
-# ---------- format node ----------
 def format_output(state: State) -> dict:
     logger.debug("format_output: start")
     analysis = state.get("analysis", {})
-    # If analysis already matches schema, pass through. Otherwise try to create a minimal schema.
     out = {
         "summary": analysis.get("summary") if isinstance(analysis, dict) else None,
         "advice": analysis.get("advice") if isinstance(analysis, dict) else None,
@@ -629,19 +556,15 @@ def format_output(state: State) -> dict:
         "recommendations": analysis.get("recommendations") if isinstance(analysis, dict) else [],
         "diagnostics": analysis.get("diagnostics") if isinstance(analysis, dict) else [],
         "raw_findings": analysis.get("raw_findings") if isinstance(analysis, dict) else state.get("raw_input", {}),
-        # include plots if generated
         "plots": analysis.get("plots") if isinstance(analysis, dict) else [],
     }
-    # Fill sensible defaults if LLM returned raw_text only
     if not out["summary"] and isinstance(analysis, dict) and "raw_text" in analysis:
         out["summary"] = "LLM returned non-JSON content. See raw_findings.raw_text."
         out["raw_findings"] = {"raw_text": analysis.get("raw_text")}
-    # ensure types are serializable
     state["output"] = out
     logger.debug("format_output: done with keys=%s", list(out.keys()))
     return {"output": out}
 
-# ---------- Wire nodes into LangGraph ----------
 graph_builder.add_node("parse_input", parse_input)
 graph_builder.add_node("analyze_with_llm", analyze_with_llm)
 graph_builder.add_node("generate_plots", generate_plots)
@@ -655,7 +578,6 @@ graph_builder.add_edge("format_output", END)
 
 graph = graph_builder.compile()
 
-# ---------- Runner helper ----------
 def run_graph(payload: dict):
     logger.info("run_graph: received payload with keys=%s", list(payload.keys())[:20] if isinstance(payload, dict) else type(payload).__name__)
     initial_state = {
@@ -663,14 +585,11 @@ def run_graph(payload: dict):
         "raw_input": payload
     }
     t0 = time.time()
-    # Compiled graphs use invoke()/stream() instead of run()
     result = graph.invoke(initial_state)
     dt = (time.time() - t0) * 1000.0
     logger.info("run_graph: completed in %.1f ms", dt)
-    # graph.run returns final state depending on version
     return result.get("output") or result
 
-# ---------- Flask endpoints ----------
 @app.route("/health", methods=["GET"])
 def health():
     logger.debug("health: ok")
@@ -687,9 +606,7 @@ def analyze():
     - application/json body with the payload
     Returns LLM-produced analysis JSON (and any generated plots).
     """
-    # 1) Get payload
     payload = None
-    # multipart file
     if "file" in request.files:
         f = request.files["file"]
         filename = secure_filename(f.filename or "upload.json")
@@ -699,7 +616,6 @@ def analyze():
             logger.warning("analyze[%s]: invalid json file: %s", req_id, e)
             return jsonify({"error": "invalid json file", "detail": str(e)}), 400
     else:
-        # try JSON body
         try:
             payload = request.get_json(force=True)
         except Exception as e:
@@ -710,17 +626,14 @@ def analyze():
         logger.warning("analyze[%s]: empty payload", req_id)
         return jsonify({"error": "empty payload"}), 400
 
-    # 2) Run LangGraph analysis
     try:
         output = run_graph(payload)
     except Exception as e:
         logger.exception("analyze[%s]: graph run failed: %s", req_id, e)
         return jsonify({"error": "graph run failed", "detail": str(e)}), 500
 
-    # 3) Return structured output
     logger.info("analyze[%s]: success", req_id)
     return jsonify(output), 200
 
-# ---------- Run app ----------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 6000)), debug=True)

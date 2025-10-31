@@ -48,4 +48,4 @@ ENV FLASK_ENV=production
 ENTRYPOINT []
 
 # Run the application
-CMD ["uv", "run", "api2.py"]
+CMD ["uv", "run", "api/api.py"]

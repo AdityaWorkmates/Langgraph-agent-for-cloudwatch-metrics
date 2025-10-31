@@ -28,13 +28,13 @@ An AWS Bedrock–powered analysis service built with LangGraph and Flask. It ing
 
 ## AI Workflow Diagram
 
-![AI-Workflow](ai-workflow.png)
+![AI-Workflow](diagrams/ai-workflow.png)
 
 ---
 
 ## Architecture Diagram
 
-![Architecture](architecture/architecture.png)
+![Architecture](diagrams/architecture.png)
 
 Source (Mermaid): `architecture/architecture.mmd`
 
