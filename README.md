@@ -26,6 +26,12 @@ An AWS Bedrock–powered analysis service built with LangGraph and Flask. It ing
 
 ---
 
+## AI Workflow Diagram
+
+![AI-Workflow](ai-workflow.png)
+
+---
+
 ## Architecture Diagram
 
 ![Architecture](architecture/architecture.png)
