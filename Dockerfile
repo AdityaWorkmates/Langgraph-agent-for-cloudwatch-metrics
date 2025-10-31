@@ -21,16 +21,9 @@ ENV UV_LINK_MODE=copy
 # Copy lock and project metadata files
 COPY pyproject.toml uv.lock ./
 
-# # Install dependencies (without dev or project installation)
-
+# Install dependencies
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
-
-# RUN --mount=type=cache,target=/root/.cache/uv \
-#     uv sync --locked --no-dev
-
-# RUN --mount=type=cache,target=/root/.cache/uv \
-# uv sync --locked --no-dev
 
 # Copy the rest of the application code
 COPY . .
@@ -48,4 +41,4 @@ ENV FLASK_ENV=production
 ENTRYPOINT []
 
 # Run the application
-CMD ["uv", "run", "api/api.py"]
+CMD ["uv", "run", "-m", "src.api"]

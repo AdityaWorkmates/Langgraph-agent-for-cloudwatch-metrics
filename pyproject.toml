@@ -16,4 +16,5 @@ dependencies = [
     "matplotlib>=3.10.7",
     "python-dotenv>=1.2.1",
     "seaborn>=0.13.2",
+    "flasgger>=0.9.7",
 ]
