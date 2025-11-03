@@ -5,11 +5,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 import urllib.parse
 import urllib3
-import base64 # <-- Required for decoding base64 images
-from email.mime.multipart import MIMEMultipart # <-- Required
-from email.mime.text import MIMEText           # <-- Required
-from email.mime.image import MIMEImage         # <-- Required
-from email.utils import formataddr             # <-- Optional nice-to-have
+import base64
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
+from email.utils import formataddr
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -19,36 +19,25 @@ ANALYSIS_ENDPOINT = os.getenv(
     "ANALYSIS_ENDPOINT",
     "http://langgraph-alb-1133416885.us-west-2.elb.amazonaws.com/analyze"
 )
-# --- SES Configuration ---
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", "aditya.d@cloudworkmates.com")
-RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "debjit.d@cloudworkmates.com")
-# --- End SES Configuration ---
+RECIPIENT_EMAIL = os.getenv("RECIENT_EMAIL", "debjit.d@cloudworkmates.com")
 
 HTTP = urllib3.PoolManager()
 
-# clients (explicit region)
 CW = boto3.client("cloudwatch", region_name=REGION)
-S3 = boto3.client("s3", region_name=REGION) # Keep if needed
+S3 = boto3.client("s3", region_name=REGION)
 SES = boto3.client("ses", region_name=REGION)
 
-# --- ts_iso_z, safe_key_component functions remain the same ---
 def ts_iso_z(dt: datetime) -> str:
-    """Return ISO-style UTC timestamp without +00:00 (Z)."""
     return dt.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec='seconds') + "Z"
 
 def safe_key_component(s: str) -> str:
-    """Make an S3-safe key component: remove colons, spaces -> underscores, and url-quote."""
     if not s:
         return "unknown"
     s2 = s.replace(":", "").replace(" ", "_").replace("/", "_")
     return urllib.parse.quote_plus(s2)
 
-# --- send_to_analysis_endpoint function remains the same ---
 def send_to_analysis_endpoint(json_payload_string: str, filename: str):
-    """
-    Sends the JSON payload string as a multipart/form-data file to the analysis endpoint.
-    Returns a dictionary with status, body, and potentially parsed JSON.
-    """
     logger.info("Sending payload to endpoint: %s as file '%s'", ANALYSIS_ENDPOINT, filename)
     fields = {'file': (filename, json_payload_string, 'application/json')}
 
@@ -90,17 +79,11 @@ def send_to_analysis_endpoint(json_payload_string: str, filename: str):
             "request_filename": filename
         }
 
-# --- CORRECTED send_ses_email function ---
 def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_name: str):
-    """
-    Formats and sends the analysis result as a multipart/related HTML email
-    using SES send_raw_email, embedding images via CIDs.
-    """
     if not SENDER_EMAIL or not RECIPIENT_EMAIL:
         logger.error("SENDER_EMAIL or RECIPIENT_EMAIL environment variables not set. Cannot send email.")
         return {"status": "error", "message": "Sender/Recipient email not configured"}
 
-    # --- FIX: Determine Subject Line FIRST ---
     subject_prefix = ""
     base_subject = f"CPU Alarm Analysis: Instance {instance_id}"
     if alarm_name:
@@ -113,31 +96,26 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
             severity = analysis_data["response_body_json"].get("severity", "UNKNOWN")
             subject_prefix = f"[{severity}] "
         else:
-            subject_prefix = "[ERROR] " # Fallback
+            subject_prefix = "[ERROR] "
     except Exception:
-         subject_prefix = "[ERROR] " # Fallback on parsing error
+         subject_prefix = "[ERROR] "
     
     final_subject = subject_prefix + base_subject
-    # --- END FIX ---
 
-    # Create the root MIME message
     msg_root = MIMEMultipart('related')
-    msg_root['Subject'] = final_subject # <-- SET SUBJECT ONLY ONCE
+    msg_root['Subject'] = final_subject
     msg_root['From'] = formataddr(("AWS CPU Analysis", SENDER_EMAIL))
     msg_root['To'] = RECIPIENT_EMAIL
 
-    # Encapsulate the plain and HTML versions
     msg_alternative = MIMEMultipart('alternative')
     msg_root.attach(msg_alternative)
 
-    # Added better styling for <pre> tag
     html_body_lines = ["<html><head><style> pre { background-color: #f4f4f4; border: 1px solid #ddd; padding: 10px; white-space: pre-wrap; word-wrap: break-word; } li { margin-bottom: 10px; } </style></head><body>"]
     text_body_lines = []
     plot_cids = {}
     plot_index = 0
 
     try:
-        # --- Handle Analysis Errors ---
         if "error" in analysis_data:
             html_body_lines.append(f"<h1>Analysis Error for Instance {instance_id}</h1>")
             html_body_lines.append(f"<p><b>Instance:</b> {instance_id} in {region}</p>")
@@ -154,12 +132,10 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
             if "request_filename" in analysis_data:
                  text_body_lines.append(f"Request Filename: {analysis_data['request_filename']}")
 
-        # --- Process Successful Analysis ---
         elif "response_body_json" in analysis_data:
             response_json = analysis_data["response_body_json"]
-            severity = response_json.get("severity", "UNKNOWN") # Already got this for subject, but good to have
+            severity = response_json.get("severity", "UNKNOWN")
 
-            # Header
             html_body_lines.append(f"<h1>CPU Alarm Analysis Report - {severity}</h1>")
             html_body_lines.append(f"<p><b>Instance:</b> {instance_id} in {region}</p>")
             html_body_lines.append(f"<p><b>Alarm Name:</b> {alarm_name or 'N/A'}</p>")
@@ -171,24 +147,20 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 "-" * 20
             ])
 
-            # Summary
             summary = response_json.get('summary', 'No summary provided.')
-            html_body_lines.extend(["<h2>Summary</h2>", f"<p>{summary.replace(chr(10), '<br/>')}</p>", "<hr>"]) # Added newline replace
+            html_body_lines.extend(["<h2>Summary</h2>", f"<p>{summary.replace(chr(10), '<br/>')}</p>", "<hr>"])
             text_body_lines.extend(["Summary:", summary, "-" * 20])
 
-            # Advice
             advice = response_json.get('advice', 'No advice provided.')
-            html_body_lines.extend(["<h2>Advice</h2>", f"<p>{advice.replace(chr(10), '<br/>')}</p>", "<hr>"]) # Added newline replace
+            html_body_lines.extend(["<h2>Advice</h2>", f"<p>{advice.replace(chr(10), '<br/>')}</p>", "<hr>"])
             text_body_lines.extend(["Advice:", advice, "-" * 20])
 
-            # Raw Findings
             raw_findings = response_json.get("raw_findings", {})
             if raw_findings:
                 raw_findings_json = json.dumps(raw_findings, indent=2)
                 html_body_lines.extend(["<h2>Key Findings (Raw)</h2>", "<pre><code>", raw_findings_json, "</code></pre>", "<hr>"])
                 text_body_lines.extend(["Key Findings:", raw_findings_json, "-" * 20])
 
-            # Recommendations
             recommendations = response_json.get("recommendations", [])
             if recommendations:
                 html_body_lines.append("<h2>Recommendations</h2><ul>")
@@ -204,7 +176,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 html_body_lines.append("</ul><hr>")
                 text_body_lines.append("-" * 20)
 
-            # Diagnostics
             diagnostics = response_json.get("diagnostics", [])
             if diagnostics:
                 html_body_lines.append("<h2>Diagnostic Commands</h2><ul>")
@@ -215,7 +186,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 html_body_lines.append("</ul><hr>")
                 text_body_lines.append("-" * 20)
 
-            # Plots (Embedded Images)
             plots = response_json.get("plots", [])
             if plots:
                 html_body_lines.append("<h2>Plots</h2>")
@@ -224,7 +194,7 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                     data_uri = plot.get("data_uri")
                     name = plot.get("name", f"plot_{plot_index}")
                     if data_uri and data_uri.startswith("data:image/png;base64,"):
-                        cid = f"plot_{plot_index}_{safe_key_component(name)}" # Unique CID
+                        cid = f"plot_{plot_index}_{safe_key_component(name)}"
                         plot_cids[plot_index] = cid
 
                         html_body_lines.append(f"<h3>{name}</h3><img src='cid:{cid}' alt='{name}' style='max-width: 100%; height: auto;'><br/><br/>")
@@ -235,27 +205,25 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                             img_part = MIMEImage(image_data, 'png', name=f"{name}.png")
                             img_part.add_header('Content-ID', f'<{cid}>')
                             img_part.add_header('Content-Disposition', 'inline', filename=f"{name}.png")
-                            msg_root.attach(img_part) # Attach to root
+                            msg_root.attach(img_part)
                             plot_index += 1
                         except Exception as img_e:
                             logger.error(f"Failed to process/attach image '{name}': {img_e}")
                             html_body_lines.append(f"<p><i>Error embedding plot: {name}</i></p><br/>")
                 html_body_lines.append("<hr>")
         
-        # --- Handle unexpected missing JSON ---
         else:
             html_body_lines.append(f"<h1>Analysis Error for Instance {instance_id}</h1>")
             html_body_lines.append(f"<p>Analysis endpoint response for {instance_id} was unparseable or incomplete.</p>")
             html_body_lines.append(f"<p>Status Code: {analysis_data.get('status_code', 'N/A')}</p>")
             html_body_lines.append("<p>Raw Body Snippet:</p><pre>")
-            html_body_lines.append(analysis_data.get('response_body_raw', '')[:500]) # Limit snippet
+            html_body_lines.append(analysis_data.get('response_body_raw', '')[:500])
             html_body_lines.append("</pre>")
             text_body_lines.append(f"Analysis endpoint response for {instance_id} was unparseable or incomplete.")
             text_body_lines.append(f"Status Code: {analysis_data.get('status_code', 'N/A')}")
             text_body_lines.append(f"Raw Body Snippet: {analysis_data.get('response_body_raw', '')[:200]}")
 
 
-        # --- Finalize and Attach Body Parts ---
         html_body_lines.append("</body></html>")
         html_body = "\n".join(html_body_lines)
         text_body = "\n".join(text_body_lines)
@@ -263,7 +231,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
         msg_alternative.attach(MIMEText(text_body, 'plain', 'utf-8'))
         msg_alternative.attach(MIMEText(html_body, 'html', 'utf-8'))
 
-        # --- Send using SES SendRawEmail ---
         logger.info("Sending raw email via SES from %s to %s", SENDER_EMAIL, RECIPIENT_EMAIL)
         response = SES.send_raw_email(
             Source=SENDER_EMAIL,
@@ -275,7 +242,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
 
     except Exception as e:
         logger.exception("Error formatting or sending SES email: %s", e)
-        # --- Fallback error email (simplified text only) ---
         try:
             fallback_subject = f"[ERROR] Failed to Send Analysis Email for {instance_id}"
             fallback_body = (
@@ -298,13 +264,12 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
             return {"status": "error", "message": f"Failed to send any email notification: {str(e)}"}
 
 
-# --- Event Parsing and Metric Fetching Functions (Unchanged) ---
 def parse_alarm_from_event(event: dict):
     alarm_name = None
     instance_id = None
     namespace = "AWS/EC2"
     metric_name = "CPUUtilization"
-    period_seconds = 300 # Default
+    period_seconds = 300
 
     try:
         if "Records" in event and event["Records"]:
@@ -362,7 +327,6 @@ def fetch_metric_data(namespace: str, metric_name: str, dimensions: list, period
         logger.exception("Error calling get_metric_data: %s", e)
         raise
 
-# --- Lambda Handler (Unchanged from previous SES version) ---
 def lambda_handler(event, context):
     logger.info("Received event: %s", json.dumps(event)[:1000])
     alarm_name, instance_id, namespace, metric_name, period_seconds = parse_alarm_from_event(event)
@@ -400,7 +364,7 @@ def lambda_handler(event, context):
                     "threshold": a.get("Threshold"), "comparison_operator": a.get("ComparisonOperator"),
                     "evaluation_periods": a.get("EvaluationPeriods"), "period_seconds": a.get("Period"),
                     "namespace": a.get("Namespace"), "metric_name": a.get("MetricName"),
-                    "dimensions": a.get("Dimensions"), # Add more fields if needed
+                    "dimensions": a.get("Dimensions"),
                 }
                 period_seconds = alarm_meta.get("period_seconds") or period_seconds
                 namespace = alarm_meta.get("namespace") or namespace
@@ -419,18 +383,14 @@ def lambda_handler(event, context):
     body_json = json.dumps(payload, default=str, indent=2)
     filename = f"{safe_key_component(alarm_name or instance_id)}_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
 
-    # --- Call Analysis Endpoint ---
     analysis_result = send_to_analysis_endpoint(body_json, filename)
 
-    # --- Send Email Notification ---
     if analysis_result.get("error") in ["http_request_failed"]:
         logger.error("Analysis request failed before getting a response. Cannot send detailed email.")
         notification_status = {"status": "skipped", "message": "Analysis HTTP request failed"}
     else:
-        # Send email regardless of metric fetch error or analysis error (to report the error)
         notification_status = send_ses_email(analysis_result, instance_id, REGION, alarm_name)
 
-    # --- Prepare Lambda Response ---
     response_body = {
         "analysis_request_status": "success" if "error" not in analysis_result else "error",
         "analysis_http_status": analysis_result.get("status_code", "N/A"),
@@ -445,7 +405,7 @@ def lambda_handler(event, context):
         logger.warning("Analysis or notification step failed/skipped. Check response body.")
         if analysis_result.get("error") in ["http_request_failed"] or \
            (notification_status.get("status") == "error" and "fallback" in notification_status.get("message", "")):
-             final_status_code = 500 # Fail critically if core request or fallback email fails
+             final_status_code = 500
 
     return {
         "statusCode": final_status_code,

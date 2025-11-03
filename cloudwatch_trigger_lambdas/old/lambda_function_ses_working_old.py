@@ -14,36 +14,25 @@ ANALYSIS_ENDPOINT = os.getenv(
     "ANALYSIS_ENDPOINT",
     "http://langgraph-alb-1133416885.us-west-2.elb.amazonaws.com/analyze"
 )
-# --- SES Configuration ---
-SENDER_EMAIL = os.getenv("SENDER_EMAIL", "aditya.d@cloudworkmates.com") # e.g., "analysis-noreply@yourdomain.com"
-RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "aditya.d@cloudworkmates.com") # e.g., "your-team@yourdomain.com"
-# --- End SES Configuration ---
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", "aditya.d@cloudworkmates.com")
+RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "aditya.d@cloudworkmates.com")
 
 HTTP = urllib3.PoolManager()
 
-# clients (explicit region)
 CW = boto3.client("cloudwatch", region_name=REGION)
-S3 = boto3.client("s3", region_name=REGION) # Keep if needed
-# SNS = boto3.client("sns", region_name=REGION) # No longer needed for email
-SES = boto3.client("ses", region_name=REGION) # <-- ADDED: SES Client
+S3 = boto3.client("s3", region_name=REGION)
+SES = boto3.client("ses", region_name=REGION)
 
-# --- ts_iso_z, safe_key_component functions remain the same ---
 def ts_iso_z(dt: datetime) -> str:
-    """Return ISO-style UTC timestamp without +00:00 (Z)."""
     return dt.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec='seconds') + "Z"
 
 def safe_key_component(s: str) -> str:
-    """Make an S3-safe key component: remove colons, spaces -> underscores, and url-quote."""
     if not s:
         return "unknown"
     s2 = s.replace(":", "").replace(" ", "_").replace("/", "_")
     return urllib.parse.quote_plus(s2)
 
-# --- send_to_analysis_endpoint function remains the same ---
 def send_to_analysis_endpoint(json_payload_string: str, filename: str):
-    """
-    Sends the JSON payload string as a multipart/form-data file to the analysis endpoint.
-    """
     logger.info("Sending payload to endpoint: %s as file '%s'", ANALYSIS_ENDPOINT, filename)
 
     fields = {'file': (filename, json_payload_string, 'application/json')}
@@ -88,11 +77,7 @@ def send_to_analysis_endpoint(json_payload_string: str, filename: str):
             "request_filename": filename
         }
 
-# --- REPLACED send_sns_notification with send_ses_email ---
 def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_name: str):
-    """
-    Formats and sends the analysis result as an HTML email using SES.
-    """
     if not SENDER_EMAIL or not RECIPIENT_EMAIL:
         logger.error("SENDER_EMAIL or RECIPIENT_EMAIL environment variables not set. Cannot send email.")
         return {"status": "error", "message": "Sender/Recipient email not configured"}
@@ -102,10 +87,9 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
         subject += f" ({alarm_name})"
 
     html_body_lines = ["<html><body>"]
-    text_body_lines = [] # Plain text version for compatibility
+    text_body_lines = []
 
     try:
-        # Check for analysis errors first
         if "error" in analysis_data:
             subject = f"[ERROR] Analyzing CPU Alarm for {instance_id}"
             html_body_lines.append(f"<h1>Analysis Error for Instance {instance_id}</h1>")
@@ -116,13 +100,11 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
             if "request_filename" in analysis_data:
                 html_body_lines.append(f"<p><b>Request Filename:</b> {analysis_data['request_filename']}</p>")
 
-            # Simple text version
             text_body_lines.append(f"Analysis failed for instance {instance_id} in {region}.")
             text_body_lines.append(f"Alarm Name: {alarm_name or 'N/A'}")
             text_body_lines.append(f"Error Type: {analysis_data.get('error', 'Unknown')}")
             text_body_lines.append(f"Error Message: {analysis_data.get('message', 'N/A')}")
 
-        # Process successful analysis
         elif "response_body_json" in analysis_data:
             response_json = analysis_data["response_body_json"]
 
@@ -153,7 +135,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
             text_body_lines.append(response_json.get('advice', 'No advice provided.'))
             text_body_lines.append("-" * 20)
 
-            # Raw Findings (formatted JSON in HTML)
             raw_findings = response_json.get("raw_findings", {})
             if raw_findings:
                 html_body_lines.append("<h2>Key Findings (Raw)</h2>")
@@ -161,7 +142,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 html_body_lines.append(json.dumps(raw_findings, indent=2))
                 html_body_lines.append("</code></pre>")
                 html_body_lines.append("<hr>")
-                # Simple text version
                 text_body_lines.append("Key Findings:")
                 peak_cpu = raw_findings.get('peak_cpu_value')
                 peak_ts = raw_findings.get('peak_timestamp')
@@ -176,7 +156,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 text_body_lines.append("-" * 20)
 
 
-            # Recommendations
             recommendations = response_json.get("recommendations", [])
             if recommendations:
                 html_body_lines.append("<h2>Recommendations</h2><ul>")
@@ -187,7 +166,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 html_body_lines.append("</ul><hr>")
                 text_body_lines.append("-" * 20)
 
-            # Diagnostics
             diagnostics = response_json.get("diagnostics", [])
             if diagnostics:
                 html_body_lines.append("<h2>Diagnostic Commands</h2><ul>")
@@ -198,7 +176,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                 html_body_lines.append("</ul><hr>")
                 text_body_lines.append("-" * 20)
 
-            # Plots (Embedded Images)
             plots = response_json.get("plots", [])
             if plots:
                 html_body_lines.append("<h2>Plots</h2>")
@@ -207,7 +184,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
                     data_uri = plot.get("data_uri")
                     name = plot.get("name", "Plot")
                     if data_uri:
-                        # Add some basic styling for responsiveness
                         html_body_lines.append(f"<h3>{name}</h3><img src='{data_uri}' alt='{name}' style='max-width: 100%; height: auto;'><br/><br/>")
                 html_body_lines.append("<hr>")
 
@@ -217,7 +193,7 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
              html_body_lines.append(f"<p>Analysis endpoint response for {instance_id} was unparseable or incomplete.</p>")
              html_body_lines.append(f"<p>Status Code: {analysis_data.get('status_code', 'N/A')}</p>")
              html_body_lines.append("<p>Raw Body Snippet:</p><pre>")
-             html_body_lines.append(analysis_data.get('response_body_raw', '')[:500]) # Limit snippet
+             html_body_lines.append(analysis_data.get('response_body_raw', '')[:500])
              html_body_lines.append("</pre>")
 
              text_body_lines.append(f"Analysis endpoint response for {instance_id} was unparseable or incomplete.")
@@ -229,11 +205,10 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
         html_body = "\n".join(html_body_lines)
         text_body = "\n".join(text_body_lines)
 
-        # Send using SES
         logger.info("Sending email via SES from %s to %s", SENDER_EMAIL, RECIPIENT_EMAIL)
         response = SES.send_email(
             Source=SENDER_EMAIL,
-            Destination={'ToAddresses': [RECIPIENT_EMAIL]}, # Can be a list
+            Destination={'ToAddresses': [RECIPIENT_EMAIL]},
             Message={
                 'Subject': {
                     'Data': subject,
@@ -256,7 +231,6 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
 
     except Exception as e:
         logger.exception("Error formatting or sending SES email: %s", e)
-        # Attempt to send a fallback error email if possible
         try:
             fallback_subject = f"[ERROR] Failed to Send Analysis Email for {instance_id}"
             fallback_body = (
@@ -278,14 +252,12 @@ def send_ses_email(analysis_data: dict, instance_id: str, region: str, alarm_nam
             return {"status": "error", "message": f"Failed to send email: {str(e)}"}
 
 
-# --- parse_alarm_from_event and fetch_metric_data functions remain the same ---
 def parse_alarm_from_event(event: dict):
-    # ... (same as before) ...
     alarm_name = None
     instance_id = None
     namespace = "AWS/EC2"
     metric_name = "CPUUtilization"
-    period_seconds = 300 # Default to 5 minutes if not found
+    period_seconds = 300
 
     try:
         if "Records" in event and event["Records"]:
@@ -293,7 +265,6 @@ def parse_alarm_from_event(event: dict):
             sns = rec.get("Sns", {})
             msg = sns.get("Message")
             if msg:
-                # sometimes Message is a JSON string describing the alarm
                 try:
                     msg_obj = json.loads(msg)
                 except Exception:
@@ -301,7 +272,6 @@ def parse_alarm_from_event(event: dict):
 
                 if isinstance(msg_obj, dict):
                     alarm_name = msg_obj.get("AlarmName") or msg_obj.get("alarmName") or alarm_name
-                    # CloudWatch alarm message may contain trigger->dimensions
                     trigger = msg_obj.get("Trigger") or msg_obj.get("trigger")
                     if trigger:
                         metric_name = trigger.get("MetricName") or metric_name
@@ -312,9 +282,7 @@ def parse_alarm_from_event(event: dict):
                             if d.get("name", d.get("Name", "")).lower() == "instanceid":
                                 instance_id = d.get("value", d.get("Value"))
                 else:
-                    # fallback: plain text message
                     alarm_name = alarm_name or sns.get("Subject") or sns.get("MessageId")
-        # event may be direct invoke with useful keys
         alarm_name = alarm_name or event.get("alarm_name") or event.get("AlarmName")
         instance_id = instance_id or event.get("instance_id")
         namespace = event.get("namespace", namespace)
@@ -326,11 +294,9 @@ def parse_alarm_from_event(event: dict):
     return alarm_name, instance_id, namespace, metric_name, period_seconds
 
 def fetch_metric_data(namespace: str, metric_name: str, dimensions: list, period_seconds: int, lookback_minutes: int = 30):
-    # ... (same as before) ...
     end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(minutes=lookback_minutes)
 
-    # MetricDataQueries form
     query = [{
         "Id": "m1",
         "MetricStat": {
@@ -342,27 +308,23 @@ def fetch_metric_data(namespace: str, metric_name: str, dimensions: list, period
     }]
 
     resp = CW.get_metric_data(MetricDataQueries=query, StartTime=start_time, EndTime=end_time)
-    # the response contains Results with Timestamps and Values
     datapoints = []
     results = resp.get("MetricDataResults", [])
     if results:
         r = results[0]
         timestamps = r.get("Timestamps", [])
         values = r.get("Values", [])
-        # pair and sort by timestamp ascending
         pairs = sorted(zip(timestamps, values), key=lambda x: x[0])
         for ts, val in pairs:
-            # ensure ts in UTC and in ISO Z format
             if isinstance(ts, datetime):
                 ts_str = ts.astimezone(timezone.utc).replace(tzinfo=None).isoformat(timespec='seconds') + "Z"
             else:
-                ts_str = str(ts) # Fallback if not datetime
+                ts_str = str(ts)
             datapoints.append({"timestamp": ts_str, "value": val})
     return datapoints, {"start_iso": ts_iso_z(start_time), "end_iso": ts_iso_z(end_time)}
 
 def lambda_handler(event, context):
     logger.info("Received event: %s", json.dumps(event)[:1000])
-    # parse inputs
     alarm_name, instance_id, namespace, metric_name, period_seconds = parse_alarm_from_event(event)
 
     instance_id = instance_id or event.get("instance_id")
@@ -374,7 +336,6 @@ def lambda_handler(event, context):
              "body": json.dumps({"error": "InstanceId not found in event payload."})
          }
 
-    # --- Rest of the metric fetching and payload creation is the same ---
     dimensions = [{"Name": "InstanceId", "Value": instance_id}]
     lookback_periods_minutes = [5, 10, 15, 30, 60, 120, 180, 360]
     all_metric_data = {}
@@ -436,18 +397,10 @@ def lambda_handler(event, context):
     alarm_comp = safe_key_component(alarm_name or instance_id)
     filename = f"{alarm_comp}_{filename_ts}.json"
 
-    # --- MODIFICATION: Send to Endpoint & then Email via SES ---
-
-    # 1. Send to analysis endpoint
     analysis_result = send_to_analysis_endpoint(body_json, filename)
 
-    # 2. Send SES email based on analysis result
-    # Only attempt to send email if analysis didn't fail catastrophically
-    # (e.g., HTTP request itself failed). Errors reported by the analysis
-    # endpoint *within* the JSON response should still be emailed.
     if analysis_result.get("error") in ["http_request_failed", "json_decode_error"]:
          logger.error("Analysis request failed before getting a usable response. Cannot send detailed email.")
-         # Optionally send a very basic failure notification via SES here if desired
          notification_status = {"status": "skipped", "message": "Analysis request failed"}
     else:
         notification_status = send_ses_email(
@@ -457,9 +410,6 @@ def lambda_handler(event, context):
             alarm_name
         )
 
-    # --- END MODIFICATION ---
-
-    # Create the final response body
     response_body = {
         "analysis_request_status": "success" if "error" not in analysis_result else "error",
         "analysis_http_status": analysis_result.get("status_code", "N/A"),
@@ -472,8 +422,6 @@ def lambda_handler(event, context):
     final_status_code = 200
     if "error" in analysis_result or notification_status.get("status") == "error":
         logger.warning("Analysis or notification step failed or was skipped. Check response body.")
-        # Optionally change to 500 for critical failures
-        # final_status_code = 500
 
     return {
         "statusCode": final_status_code,

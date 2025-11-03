@@ -17,7 +17,7 @@ An AWS Bedrock–powered analysis service built with LangGraph and Flask. It ing
 
 ## Architecture Overview
 
-- `api2.py`: Primary Flask app exposing `/health` and `/analyze`. Builds a LangGraph with nodes: `parse_input` → `analyze_with_llm` → `generate_plots` → `format_output`. Uses `matplotlib` to create plots when time-series data is detected.
+- `src\api.py`: Primary Flask app exposing `/health` and `/analyze`. Builds a LangGraph with nodes: `parse_input` → `analyze_with_llm` → `generate_plots` → `format_output`. Uses `matplotlib` to create plots when time-series data is detected.
 - `api.py`: A smaller variant of the API without CORS and plotting; kept as a reference/minimal version.
 - `cloudwatch_trigger_lambdas/`: Lambda handlers that construct CloudWatch queries, call the analysis endpoint, and notify via SNS or SES.
 - `cpu_stress_test/load_test.py`: Multi-process CPU stress generator to help trigger CloudWatch alarms.
@@ -100,7 +100,7 @@ The Docker image uses `uv`, but you can also run locally with it.
 ```bash
 # From repo root
 uv sync --locked --no-dev
-uv run api2.py
+uv run src\api.py
 # Service listens on http://localhost:6000
 ```
 
@@ -110,7 +110,7 @@ python -m venv .venv
 . .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -U pip
 pip install -r <(uv pip compile pyproject.toml -q)  # or install per pyproject with your tool
-python api2.py
+python src\api.py
 ```
 
 ---
@@ -174,7 +174,7 @@ docker run --rm -p 6000:6000 \
 
 Notes:
 - Image is based on `ghcr.io/astral-sh/uv:python3.12-bookworm-slim`.
-- The container’s default `CMD` is `uv run api2.py`.
+- The container’s default `CMD` is `uv run src\api.py`.
 
 ---
 
@@ -248,7 +248,7 @@ Behavior:
 - LangChain import errors: Ensure `langchain` and `langchain-aws` versions meet requirements in `pyproject.toml`.
 - Empty or invalid JSON from model: The API attempts to extract JSON from fenced code blocks or via brace matching. Check logs and adjust prompts if needed.
 - Plots missing: Ensure payload includes timestamped series; see `metric_data_by_range` format produced by Lambdas.
-- CORS: `api2.py` enables CORS via `flask-cors`. Adjust if deploying behind internal ALBs.
+- CORS: `src\api.py` enables CORS via `flask-cors`. Adjust if deploying behind internal ALBs.
 
 Logs: Controlled by `LOG_LEVEL`. ECS task definition configures `awslogs`.
 

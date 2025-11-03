@@ -24,7 +24,6 @@ logging.basicConfig(
 
 app.register_blueprint(main_routes)
 
-# The following is for development purposes only.
-# For production, use a production-ready WSGI server like Gunicorn or Waitress.
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 6000)), debug=True)

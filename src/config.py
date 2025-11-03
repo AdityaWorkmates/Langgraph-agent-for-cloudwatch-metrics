@@ -1,5 +1,8 @@
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 MODEL_ID = os.getenv("MODEL_ID", "us.anthropic.claude-sonnet-4-20250514-v1:0")
 AWS_REGION = os.getenv("AWS_REGION", "us-west-2")
@@ -28,3 +31,34 @@ if os.getenv("LANGCHAIN_TRACING_V2") is None and os.getenv("LANGCHAIN_API_KEY"):
 if MODEL_ID is None:
     raise RuntimeError(
         "Set BEDROCK_MODEL_ID environment variable to the Bedrock model id you want to use.")
+
+
+SYSTEM_PROMPT = '''
+You are a cloud reliability assistant. You will be given an input JSON payload containing monitoring, metrics, or alarm information.
+The payload structure may vary. Tasks:
+1) Extract key facts (resource id, metric name, timestamps, values, threshold, alarm state, actions).
+2) Produce a short SUMMARY (2-4 sentences) describing what happened.
+3) Provide ADVICE (one-paragraph) and a prioritized list of REMEDIATION recommendations (immediate, short-term, long-term).
+4) Provide DIAGNOSTIC COMMANDS to run (concrete aws/ssm/journalctl/top/ps commands).
+5) Assign SEVERITY (CRITICAL/HIGH/MEDIUM/LOW) and a numeric CONFIDENCE 0.0-1.0.
+6) Output strictly valid JSON (no extra plaintext), matching the schema below.
+
+RESPONSE_SCHEMA:
+{
+  "summary": "<string>",
+  "advice": "<string>",
+  "severity": "<CRITICAL|HIGH|MEDIUM|LOW>",
+  "confidence": <0.0-1.0>,
+  "recommendations": [
+    {
+      "title": "<short>",
+      "what": "<steps>",
+      "why": "<reason>",
+      "effort": "<low|medium|high>",
+      "priority": "<P0|P1|P2|P3>"
+    },...
+  ],
+  "diagnostics": ["<command1>", "<command2>", ...],
+  "raw_findings": { ... }
+}
+'''
