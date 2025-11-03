@@ -38,6 +38,9 @@ graph_builder.add_edge("format_output", END)
 
 graph = graph_builder.compile()
 
+
+
+
 @main_routes.route('/health', methods=['GET'])
 def health():
     """Health check endpoint.

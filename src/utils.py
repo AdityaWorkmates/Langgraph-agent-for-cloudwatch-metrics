@@ -23,12 +23,13 @@ from src.config import (
     MODEL_TEMPERATURE,
     AWS_ACCESS_KEY_ID,
     AWS_SECRET_ACCESS_KEY,
-    AWS_SESSION_TOKEN
+    AWS_SESSION_TOKEN,
+    SYSTEM_PROMPT
 )
 
 logger = logging.getLogger(__name__)
 
-# State TypedDict for LangGraph
+# State Cladss for LangGraph
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     raw_input: dict
@@ -317,7 +318,7 @@ def parse_input(state: State) -> dict:
     state["raw_input"] = raw
     try:
         keys = list(raw.keys()) if isinstance(raw, dict) else []
-        logger.debug("parse_input: parsed keys=%s", keys[:20])
+        logger.debug("parse_input: parsed keys=%s", keys)
     except Exception:
         logger.debug("parse_input: parsed payload (keys unavailable)")
     return {"raw_input": state["raw_input"]}
