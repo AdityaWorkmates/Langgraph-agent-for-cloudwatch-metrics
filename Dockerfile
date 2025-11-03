@@ -32,7 +32,7 @@ COPY . .
 ENV PATH="/app/.venv/bin:$PATH"
 
 # Expose the port the app runs on
-EXPOSE 6000
+EXPOSE 5000
 
 # Set environment variables
 ENV FLASK_ENV=production

@@ -89,42 +89,34 @@ def _is_number(v):
     return isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())
 
 
-def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
-    """
-    Heuristic extractor that returns a list of time-series dicts:
-    [{'name': name, 'times': [datetime, ...], 'values': [num, ...]}, ...]
-    It tries several common payload shapes:
-     - list of dicts with keys like 'timestamp' / 'time' and a numeric value key
-     - dict with 'timestamps' and 'values' lists
-     - dict with nested metrics e.g. {'metrics': [{'name':..., 'points': [{'t':..., 'v':...}, ...]}, ...]}
-    """
+def _extract_from_metric_data_by_range(payload: dict) -> list:
+    """Extracts time series from the 'metric_data_by_range' shape."""
     series = []
-
-    try:
-        if isinstance(payload, dict) and isinstance(payload.get("metric_data_by_range"), dict):
-            ranges = payload.get("metric_data_by_range") or {}
-            for range_name, range_obj in ranges.items():
-                datapoints = (range_obj or {}).get("datapoints") or []
-                if not isinstance(datapoints, list) or not datapoints:
+    if isinstance(payload, dict) and isinstance(payload.get("metric_data_by_range"), dict):
+        ranges = payload.get("metric_data_by_range") or {}
+        for range_name, range_obj in ranges.items():
+            datapoints = (range_obj or {}).get("datapoints") or []
+            if not isinstance(datapoints, list) or not datapoints:
+                continue
+            times = []
+            values = []
+            for dp in datapoints:
+                if not isinstance(dp, dict):
                     continue
-                times = []
-                values = []
-                for dp in datapoints:
-                    if not isinstance(dp, dict):
-                        continue
-                    t = _parse_timestamp(dp.get("timestamp"))
-                    v = dp.get("value")
-                    try:
-                        v = float(v) if _is_number(v) else None
-                    except Exception:
-                        v = None
-                    times.append(t)
-                    values.append(v)
-                series.append({"name": f"cpu_{range_name}",
-                              "times": times, "values": values})
-    except Exception:
-        pass
+                t = _parse_timestamp(dp.get("timestamp"))
+                v = dp.get("value")
+                try:
+                    v = float(v) if _is_number(v) else None
+                except Exception:
+                    v = None
+                times.append(t)
+                values.append(v)
+            series.append({"name": f"cpu_{range_name}", "times": times, "values": values})
+    return series
 
+def _extract_from_timestamps_and_values(payload: dict) -> list:
+    """Extracts time series from the 'timestamps' and 'values' shape."""
+    series = []
     if isinstance(payload, dict):
         if "timestamps" in payload and "values" in payload:
             ts = payload.get("timestamps", [])
@@ -132,9 +124,12 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
             if isinstance(ts, list) and isinstance(vs, list) and len(ts) == len(vs):
                 times = [_parse_timestamp(t) for t in ts]
                 values = [float(v) if _is_number(v) else None for v in vs]
-                series.append(
-                    {"name": "series", "times": times, "values": values})
+                series.append({"name": "series", "times": times, "values": values})
+    return series
 
+def _extract_from_list_of_dicts(payload: list) -> list:
+    """Extracts time series from a list of dictionaries."""
+    series = []
     if isinstance(payload, list) and payload and all(isinstance(x, dict) for x in payload):
         ts_keys = ("timestamp", "time", "date", "t", "ts")
         val_keys = None
@@ -169,7 +164,11 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                 except Exception:
                     values.append(None)
             series.append({"name": val_keys, "times": times, "values": values})
+    return series
 
+def _extract_from_nested_metrics(payload: dict) -> list:
+    """Extracts time series from a nested metrics shape."""
+    series = []
     if isinstance(payload, dict) and "metrics" in payload and isinstance(payload["metrics"], list):
         for m in payload["metrics"]:
             if isinstance(m, dict):
@@ -179,34 +178,41 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                     values = []
                     for p in points:
                         if isinstance(p, dict):
-                            t = p.get("t") or p.get("timestamp") or p.get(
-                                "time") or p.get("date")
+                            t = p.get("t") or p.get("timestamp") or p.get("time") or p.get("date")
                             v = p.get("v") or p.get("value") or p.get("val")
                             times.append(_parse_timestamp(t))
                             try:
-                                values.append(
-                                    float(v) if _is_number(v) else None)
+                                values.append(float(v) if _is_number(v) else None)
                             except Exception:
                                 values.append(None)
                         elif isinstance(p, list) and len(p) >= 2:
                             times.append(_parse_timestamp(p[0]))
                             try:
-                                values.append(
-                                    float(p[1]) if _is_number(p[1]) else None)
+                                values.append(float(p[1]) if _is_number(p[1]) else None)
                             except Exception:
                                 values.append(None)
                     name = m.get("name") or m.get("metric") or "metric"
-                    series.append(
-                        {"name": name, "times": times, "values": values})
+                    series.append({"name": name, "times": times, "values": values})
+    return series
+
+def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
+    """
+    Heuristic extractor that returns a list of time-series dicts:
+    [{'name': name, 'times': [datetime, ...], 'values': [num, ...]}, ...]
+    It tries several common payload shapes.
+    """
+    series = []
+    series.extend(_extract_from_metric_data_by_range(payload))
+    series.extend(_extract_from_timestamps_and_values(payload))
+    series.extend(_extract_from_list_of_dicts(payload))
+    series.extend(_extract_from_nested_metrics(payload))
 
     cleaned = []
     for s in series:
-        pts = [(t, v) for t, v in zip(s.get("times", []), s.get(
-            "values", [])) if t is not None and v is not None]
+        pts = [(t, v) for t, v in zip(s.get("times", []), s.get("values", [])) if t is not None and v is not None]
         if len(pts) >= 2:
             times, values = zip(*pts)
-            cleaned.append({"name": s.get("name", "series"),
-                           "times": list(times), "values": list(values)})
+            cleaned.append({"name": s.get("name", "series"), "times": list(times), "values": list(values)})
     return cleaned
 
 
