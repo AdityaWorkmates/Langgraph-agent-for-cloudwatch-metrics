@@ -50,7 +50,7 @@ def main():
 
     try:
         while True:
-            print(f"\n🔥 ({time.strftime('%H:%M:%S')}) Starting 5-minute stress test on {num_cores} cores...")
+            print(f"\n({time.strftime('%H:%M:%S')}) Starting 5-minute stress test on {num_cores} cores...")
             
             stop_event = multiprocessing.Event()
             pool = []
@@ -62,16 +62,16 @@ def main():
 
             time.sleep(stress_duration_sec)
 
-            print(f"🛑 ({time.strftime('%H:%M:%S')}) Stopping worker processes...")
+            print(f"({time.strftime('%H:%M:%S')}) Stopping worker processes...")
             stop_event.set()
             for p in pool:
                 p.join()
-            print("✅ Stress test complete.")
+            print("Stress test complete.")
 
             wait_duration_sec = random.uniform(min_wait_min * 60, max_wait_min * 60)
             wait_until = time.time() + wait_duration_sec
             
-            print(f"🕒 ({time.strftime('%H:%M:%S')}) Waiting for next run...")
+            print(f"({time.strftime('%H:%M:%S')}) Waiting for next run...")
             print(f"   (Next test will start in {str(timedelta(seconds=int(wait_duration_sec)))} at {time.strftime('%H:%M:%S', time.localtime(wait_until))})")
             
             while time.time() < wait_until:
@@ -79,10 +79,10 @@ def main():
 
 
     except KeyboardInterrupt:
-        print("\n\n🚫 KeyboardInterrupt detected! Stopping all tasks...")
+        print("\n\nKeyboardInterrupt detected! Stopping all tasks...")
     
     finally:
-        print("🛑 Shutting down...")
+        print("Shutting down...")
         
         if stop_event and not stop_event.is_set():
             print("   Signaling processes to stop...")
@@ -92,7 +92,7 @@ def main():
             if p.is_alive():
                 p.join()
         
-        print("✅ Test successfully terminated.")
+        print("Test successfully terminated.")
         print("=" * 60)
 
 
