@@ -2,7 +2,6 @@
 
 import json
 import logging
-import time
 from datetime import datetime, timezone
 from typing import Annotated, TypedDict, Any, List, Dict
 import io
@@ -14,7 +13,9 @@ matplotlib.use("Agg")
 
 from langchain.chat_models import init_chat_model
 from langgraph.graph.message import add_messages
-from langgraph.graph import State
+from langchain.chat_models import init_chat_model
+from langgraph.graph import StateGraph, START, END
+
 
 from src.config import (
     MODEL_ID,
@@ -335,7 +336,6 @@ def analyze_with_llm(state: State) -> dict:
     ]
     response_text = None
     try:
-        t0 = time.time()
         if hasattr(llm, "invoke"):
             resp = llm.invoke(messages)
             if hasattr(resp, "content"):
@@ -354,8 +354,6 @@ def analyze_with_llm(state: State) -> dict:
                     "content") or resp.get("text") or str(resp)
             else:
                 response_text = str(resp)
-        dt = (time.time() - t0) * 1000.0
-        logger.info("LLM call completed in %.1f ms", dt)
         if response_text:
             logger.debug("LLM raw text length=%d", len(response_text))
     except Exception as e:
@@ -503,8 +501,5 @@ def run_graph(graph, payload: dict):
         "messages": [{"role": "user", "content": json.dumps(payload)}],
         "raw_input": payload
     }
-    t0 = time.time()
     result = graph.invoke(initial_state)
-    dt = (time.time() - t0) * 1000.0
-    logger.info("run_graph: completed in %.1f ms", dt)
     return result.get("output") or result
