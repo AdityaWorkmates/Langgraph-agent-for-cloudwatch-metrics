@@ -95,8 +95,7 @@ def extract_json_from_text(text: str):
             if "\n" in block:
                 first_line, rest = block.split("\n", 1)
                 lang = first_line.strip().lower()
-                candidate = rest if lang in (
-                    "json", "javascript", "js") else block
+                candidate = rest if lang in ("json") else block
             else:
                 candidate = block
             candidate = candidate.strip()
@@ -126,79 +125,92 @@ def parse_timestamp(value):
     if value is None:
         return None
     try:
-        if isinstance(value, (int, float)):
-            if value > 1e12:
-                return datetime.fromtimestamp(value / 1000.0, tz=timezone.utc)
-            if value > 1e9:
-                return datetime.fromtimestamp(value, tz=timezone.utc)
-        if isinstance(value, str) and value.isdigit():
-            n = int(value)
-            if n > 1e12:
-                return datetime.fromtimestamp(n / 1000.0, tz=timezone.utc)
-            if n > 1e9:
-                return datetime.fromtimestamp(n, tz=timezone.utc)
-    except Exception:
+        num_value = float(value)
+        if num_value > 1e12:
+            return datetime.fromtimestamp(num_value / 1000.0, tz=timezone.utc)
+        if num_value > 1e9:
+            return datetime.fromtimestamp(num_value, tz=timezone.utc)
+    except (ValueError, TypeError):
         pass
 
-    if isinstance(value, str):
-        s = value.strip()
+    if not isinstance(value, str):
+        return None
+
+    s = value.strip()
+
+    
+    if s.endswith("Z"):
+        s = s[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(s)
+    except ValueError:
+        pass
+
+    
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
-            if s.endswith("Z"):
-                s2 = s.replace("Z", "+00:00")
-                return datetime.fromisoformat(s2)
-            return datetime.fromisoformat(s)
-        except Exception:
-            pass
-        for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
-            try:
-                return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
-            except Exception:
-                continue
+            return datetime.strptime(s, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+
     return None
 
 
-def is_number(v):
-    return isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())
 
-
-def extract_from_metric_data_by_range(payload: dict) -> list:
-    series = []
-    if isinstance(payload, dict) and isinstance(payload.get("metric_data_by_range"), dict):
-        ranges = payload.get("metric_data_by_range") or {}
-        for range_name, range_obj in ranges.items():
-            datapoints = (range_obj or {}).get("datapoints") or []
-            if not isinstance(datapoints, list) or not datapoints:
-                continue
-            times = []
-            values = []
-            for dp in datapoints:
-                if not isinstance(dp, dict):
-                    continue
-                t = parse_timestamp(dp.get("timestamp"))
-                v = dp.get("value")
-                try:
-                    v = float(v) if is_number(v) else None
-                except Exception:
-                    v = None
-                times.append(t)
-                values.append(v)
-            series.append({"name": f"cpu_{range_name}", "times": times, "values": values})
-    return series
-
-def extract_from_timestamps_and_values(payload: dict) -> list:
-    series = []
+def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
+    series_found = []
     if isinstance(payload, dict):
+        if isinstance(payload.get("metric_data_by_range"), dict):
+            ranges = payload.get("metric_data_by_range") or {}
+            for range_name, range_obj in ranges.items():
+                datapoints = (range_obj or {}).get("datapoints") or []
+                if not isinstance(datapoints, list) or not datapoints:
+                    continue
+                times = []
+                values = []
+                for dp in datapoints:
+                    if not isinstance(dp, dict):
+                        continue
+                    t = parse_timestamp(dp.get("timestamp"))
+                    v = dp.get("value")
+                    try:
+                        v = float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None
+                    except Exception:
+                        v = None
+                    times.append(t)
+                    values.append(v)
+                series_found.append({"name": f"cpu_{range_name}", "times": times, "values": values})
         if "timestamps" in payload and "values" in payload:
             ts = payload.get("timestamps", [])
             vs = payload.get("values", [])
             if isinstance(ts, list) and isinstance(vs, list) and len(ts) == len(vs):
                 times = [parse_timestamp(t) for t in ts]
-                values = [float(v) if is_number(v) else None for v in vs]
-                series.append({"name": "series", "times": times, "values": values})
-    return series
-
-def extract_from_list_of_dicts(payload: list) -> list:
-    series = []
+                values = [float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None for v in vs]
+                series_found.append({"name": "series", "times": times, "values": values})
+        if "metrics" in payload and isinstance(payload.get("metrics"), list):
+            for m in payload["metrics"]:
+                if isinstance(m, dict):
+                    points = m.get("points") or m.get("data") or m.get("values")
+                    if isinstance(points, list) and points:
+                        times = []
+                        values = []
+                        for p in points:
+                            if isinstance(p, dict):
+                                t = p.get("t") or p.get("timestamp") or p.get("time") or p.get("date")
+                                v = p.get("v") or p.get("value") or p.get("val")
+                                times.append(parse_timestamp(t))
+                                try:
+                                    values.append(float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None)
+                                except Exception:
+                                    values.append(None)
+                            elif isinstance(p, list) and len(p) >= 2:
+                                times.append(parse_timestamp(p[0]))
+                                try:
+                                    values.append(float(p[1]) if (isinstance(p[1], (int, float)) or (isinstance(p[1], str) and p[1].replace(".", "", 1).isdigit())) else None)
+                                except Exception:
+                                    values.append(None)
+                        name = m.get("name") or m.get("metric") or "metric"
+                        series_found.append({"name": name, "times": times, "values": values})
     if isinstance(payload, list) and payload and all(isinstance(x, dict) for x in payload):
         ts_keys = ("timestamp", "time", "date", "t", "ts")
         val_keys = None
@@ -206,7 +218,7 @@ def extract_from_list_of_dicts(payload: list) -> list:
             for k, v in d.items():
                 if k.lower() in ts_keys:
                     continue
-                if is_number(v):
+                if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())):
                     val_keys = k
                     break
             if val_keys:
@@ -229,49 +241,12 @@ def extract_from_list_of_dicts(payload: list) -> list:
                 times.append(t)
                 v = d.get(val_keys)
                 try:
-                    values.append(float(v) if is_number(v) else None)
+                    values.append(float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None)
                 except Exception:
                     values.append(None)
-            series.append({"name": val_keys, "times": times, "values": values})
-    return series
-
-def extract_from_nested_metrics(payload: dict) -> list:
-    series = []
-    if isinstance(payload, dict) and "metrics" in payload and isinstance(payload["metrics"], list):
-        for m in payload["metrics"]:
-            if isinstance(m, dict):
-                points = m.get("points") or m.get("data") or m.get("values")
-                if isinstance(points, list) and points:
-                    times = []
-                    values = []
-                    for p in points:
-                        if isinstance(p, dict):
-                            t = p.get("t") or p.get("timestamp") or p.get("time") or p.get("date")
-                            v = p.get("v") or p.get("value") or p.get("val")
-                            times.append(parse_timestamp(t))
-                            try:
-                                values.append(float(v) if is_number(v) else None)
-                            except Exception:
-                                values.append(None)
-                        elif isinstance(p, list) and len(p) >= 2:
-                            times.append(parse_timestamp(p[0]))
-                            try:
-                                values.append(float(p[1]) if is_number(p[1]) else None)
-                            except Exception:
-                                values.append(None)
-                    name = m.get("name") or m.get("metric") or "metric"
-                    series.append({"name": name, "times": times, "values": values})
-    return series
-
-def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
-    series = []
-    series.extend(extract_from_metric_data_by_range(payload))
-    series.extend(extract_from_timestamps_and_values(payload))
-    series.extend(extract_from_list_of_dicts(payload))
-    series.extend(extract_from_nested_metrics(payload))
-
+            series_found.append({"name": val_keys, "times": times, "values": values})
     cleaned = []
-    for s in series:
+    for s in series_found:
         pts = [(t, v) for t, v in zip(s.get("times", []), s.get("values", [])) if t is not None and v is not None]
         if len(pts) >= 2:
             times, values = zip(*pts)
@@ -493,7 +468,7 @@ def format_output(state: State) -> dict:
     logger.debug("format_output: done with keys=%s", list(out.keys()))
     return {"output": out}
 
-# main function to run the graph
+# run_graph() function to run the graph
 def run_graph(graph, payload: dict):
     logger.info("run_graph: received payload with keys=%s", list(payload.keys())
                 if isinstance(payload, dict) else type(payload).__name__)
