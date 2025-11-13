@@ -188,34 +188,34 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
                 values = [float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None for v in vs]
                 series_found.append({"name": "series", "times": times, "values": values})
         if "metrics" in payload and isinstance(payload.get("metrics"), list):
-            for m in payload["metrics"]:
-                if isinstance(m, dict):
-                    points = m.get("points") or m.get("data") or m.get("values")
+            for metric in payload["metrics"]:
+                if isinstance(metric, dict):
+                    points = metric.get("points") or metric.get("data") or metric.get("values")
                     if isinstance(points, list) and points:
                         times = []
                         values = []
-                        for p in points:
-                            if isinstance(p, dict):
-                                t = p.get("t") or p.get("timestamp") or p.get("time") or p.get("date")
-                                v = p.get("v") or p.get("value") or p.get("val")
+                        for point in points:
+                            if isinstance(point, dict):
+                                t = point.get("t") or point.get("timestamp") or point.get("time") or point.get("date")
+                                v = point.get("v") or point.get("value") or point.get("val")
                                 times.append(parse_timestamp(t))
                                 try:
                                     values.append(float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None)
                                 except Exception:
                                     values.append(None)
-                            elif isinstance(p, list) and len(p) >= 2:
-                                times.append(parse_timestamp(p[0]))
+                            elif isinstance(point, list) and len(point) >= 2:
+                                times.append(parse_timestamp(point[0]))
                                 try:
-                                    values.append(float(p[1]) if (isinstance(p[1], (int, float)) or (isinstance(p[1], str) and p[1].replace(".", "", 1).isdigit())) else None)
+                                    values.append(float(point[1]) if (isinstance(point[1], (int, float)) or (isinstance(point[1], str) and point[1].replace(".", "", 1).isdigit())) else None)
                                 except Exception:
                                     values.append(None)
-                        name = m.get("name") or m.get("metric") or "metric"
+                        name = metric.get("name") or metric.get("metric") or "metric"
                         series_found.append({"name": name, "times": times, "values": values})
     if isinstance(payload, list) and payload and all(isinstance(x, dict) for x in payload):
         ts_keys = ("timestamp", "time", "date", "t", "ts")
         val_keys = None
-        for d in payload:
-            for k, v in d.items():
+        for data_point in payload:
+            for k, v in data_point.items():
                 if k.lower() in ts_keys:
                     continue
                 if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())):
@@ -226,31 +226,31 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
         if val_keys:
             times = []
             values = []
-            for d in payload:
+            for data_point in payload:
                 t = None
                 for tk in ts_keys:
-                    if tk in d:
-                        t = parse_timestamp(d[tk])
+                    if tk in data_point:
+                        t = parse_timestamp(data_point[tk])
                         break
                 if t is None:
-                    for k in d:
+                    for k in data_point:
                         if "date" in k.lower() or "time" in k.lower() or k.lower().endswith("_at"):
-                            t = parse_timestamp(d[k])
+                            t = parse_timestamp(data_point[k])
                             if t:
                                 break
                 times.append(t)
-                v = d.get(val_keys)
+                v = data_point.get(val_keys)
                 try:
                     values.append(float(v) if (isinstance(v, (int, float)) or (isinstance(v, str) and v.replace(".", "", 1).isdigit())) else None)
                 except Exception:
                     values.append(None)
             series_found.append({"name": val_keys, "times": times, "values": values})
     cleaned = []
-    for s in series_found:
-        pts = [(t, v) for t, v in zip(s.get("times", []), s.get("values", [])) if t is not None and v is not None]
-        if len(pts) >= 2:
-            times, values = zip(*pts)
-            cleaned.append({"name": s.get("name", "series"), "times": list(times), "values": list(values)})
+    for series in series_found:
+        valid_points = [(t, v) for t, v in zip(series.get("times", []), series.get("values", [])) if t is not None and v is not None]
+        if len(valid_points) >= 2:
+            times, values = zip(*valid_points)
+            cleaned.append({"name": series.get("name", "series"), "times": list(times), "values": list(values)})
     return cleaned
 
 
@@ -373,55 +373,55 @@ def analyze_with_llm(state: State) -> dict:
 
 
 
-def get_plot_candidates(state: State) -> list:
+def collect_data_for_plotting(state: State) -> list:
     payload = state.get("raw_input") or {}
     analysis = state.get("analysis") or {}
-    candidates = []
+    potential_data_sources = []
     if isinstance(analysis, dict) and analysis.get("raw_findings"):
-        candidates.append(analysis["raw_findings"])
+        potential_data_sources.append(analysis["raw_findings"])
     if payload:
-        candidates.append(payload)
+        potential_data_sources.append(payload)
 
-    for c in list(candidates):
+    for c in list(potential_data_sources):
         if isinstance(c, dict) and c.get("metric_data_by_range"):
-            candidates.append(c.get("metric_data_by_range"))
+            potential_data_sources.append(c.get("metric_data_by_range"))
 
     if isinstance(payload, dict) and payload.get("metric_data_by_range"):
-        candidates.append(payload.get("metric_data_by_range"))
-    uniq_candidates = []
+        potential_data_sources.append(payload.get("metric_data_by_range"))
+    unique_data_sources = []
     seen_ids = set()
-    for c in candidates:
-        cid = id(c)
+    for source in potential_data_sources:
+        cid = id(source)
         if cid not in seen_ids:
             seen_ids.add(cid)
-            uniq_candidates.append(c)
-    return uniq_candidates
+            unique_data_sources.append(source)
+    return unique_data_sources
 
 
 
 
 
 
-def extract_and_merge_series(candidates: list) -> list:
+def extract_and_merge_series(data_sources: list) -> list:
 
     series_found = []
-    for idx, cand in enumerate(candidates):
+    for idx, source in enumerate(data_sources):
         try:
-            s = extract_time_series(cand)
-            logger.debug("generate_plots: candidate[%d] -> %d series", idx, len(s))
-            series_found.extend(s)
+            extracted_series = extract_time_series(source)
+            logger.debug("generate_plots: candidate[%d] -> %d series", idx, len(extracted_series))
+            series_found.extend(extracted_series)
         except Exception as e:
             logger.exception("generate_plots: extract_time_series failed on candidate[%d]: %s", idx, e)
     merged = []
     seen_keys = set()
-    for s in series_found:
+    for series in series_found:
         try:
-            times = s.get("times", [])
-            vals = s.get("values", [])
+            times = series.get("times", [])
+            vals = series.get("values", [])
             if not times or not vals or len(times) < 2:
                 continue
             key = (
-                s.get("name"),
+                series.get("name"),
                 len(times),
                 times[0].isoformat() if times[0] else None,
                 times[-1].isoformat() if times[-1] else None,
@@ -429,7 +429,7 @@ def extract_and_merge_series(candidates: list) -> list:
             if key in seen_keys:
                 continue
             seen_keys.add(key)
-            merged.append(s)
+            merged.append(series)
         except Exception:
             continue
     return merged
@@ -440,18 +440,18 @@ def extract_and_merge_series(candidates: list) -> list:
 
 def create_plots(series: list) -> list:
     plots = []
-    for s in series:
+    for series_item in series:
         try:
-            name = s.get("name", "series")
-            times = s.get("times", [])
-            values = s.get("values", [])
+            name = series_item.get("name", "series")
+            times = series_item.get("times", [])
+            values = series_item.get("values", [])
             if len(times) < 2 or len(values) < 2:
                 continue
             data_uri = plot_series_to_base64(times, values, title=name)
             plots.append({"name": name, "data_uri": data_uri})
         except Exception as e:
             logger.exception(
-                "generate_plots: plotting failed for %s: %s", s.get("name"), e
+                "generate_plots: plotting failed for %s: %s", series_item.get("name"), e
             )
             continue
     return plots
@@ -461,15 +461,15 @@ def create_plots(series: list) -> list:
 # generate plots node
 def generate_plots(state: State) -> dict:
     logger.debug("generate_plots: start")
-    candidates = get_plot_candidates(state)
-    series = extract_and_merge_series(candidates)
+    potential_data_sources = collect_data_for_plotting(state)
+    series = extract_and_merge_series(potential_data_sources)
     plots = create_plots(series)
     state.setdefault("analysis", {})
     state["analysis"]["plots"] = plots
     logger.debug(
         "generate_plots: created %d plots from %d candidates",
         len(plots),
-        len(candidates),
+        len(potential_data_sources),
     )
     return {"analysis": state["analysis"]}
 

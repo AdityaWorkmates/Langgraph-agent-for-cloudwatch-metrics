@@ -94,11 +94,11 @@ def analyze():
     logger.info(f"Request body: {request.get_data(as_text=True)}")
     payload = None
     if "file" in request.files:
-        f = request.files["file"]
-        filename = secure_filename(f.filename or "upload.json")
+        uploaded_file = request.files["file"]
+        filename = secure_filename(uploaded_file.filename or "upload.json")
         logger.info(f"Processing uploaded file: {filename}")
         try:
-            payload = json.load(f)
+            payload = json.load(uploaded_file)
         except Exception as e:
             logger.warning(f"Invalid JSON file uploaded: {e}")
             return jsonify({"error": "invalid json file", "detail": str(e)}), 400
