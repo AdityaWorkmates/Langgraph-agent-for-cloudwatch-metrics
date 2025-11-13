@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 main_routes = Blueprint('main_routes', __name__)
 
+
+
+
+
+
+
+
+
 graph_builder = StateGraph(State)
 
 graph_builder.add_node("parse_input", parse_input)
@@ -37,6 +45,9 @@ graph_builder.add_edge("generate_plots", "format_output")
 graph_builder.add_edge("format_output", END)
 
 graph = graph_builder.compile()
+
+
+
 
 
 
@@ -77,8 +88,7 @@ def analyze():
       500:
         description: An error occurred during the analysis.
     """
-    req_id = getattr(request, "environ", {}).get(
-        "REQUEST_ID") or str(int(time.time() * 1000))
+    req_id = getattr(request, "environ", {}).get("REQUEST_ID") or str(int(time.time() * 1000))
     logger.info(f"Analyze request {req_id} received")
     logger.info(f"Request headers: {request.headers}")
     logger.info(f"Request body: {request.get_data(as_text=True)}")

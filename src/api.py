@@ -15,7 +15,6 @@ app = Flask(__name__)
 CORS(app)
 Swagger(app)
 
-app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL, logging.INFO),

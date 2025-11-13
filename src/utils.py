@@ -254,6 +254,9 @@ def extract_time_series(payload: Any) -> List[Dict[str, Any]]:
     return cleaned
 
 
+
+
+
 def plot_series_to_base64(times: List[datetime], values: List[float], title: str = None) -> str:
     fig, ax = plt.subplots(figsize=(8, 3.5))
     ax.plot(times, values, marker="o", linewidth=1)
@@ -269,6 +272,10 @@ def plot_series_to_base64(times: List[datetime], values: List[float], title: str
     buf.seek(0)
     b64 = base64.b64encode(buf.read()).decode("ascii")
     return f"data:image/png;base64,{b64}"
+
+
+
+
 
 
 # parse input node
@@ -298,6 +305,15 @@ def parse_input(state: State) -> dict:
     except Exception:
         logger.debug("parse_input: parsed payload (keys unavailable)")
     return {"raw_input": state["raw_input"]}
+
+
+
+
+
+
+
+
+
 
 # analyze with LLM node
 def analyze_with_llm(state: State) -> dict:
@@ -354,6 +370,9 @@ def analyze_with_llm(state: State) -> dict:
     return {"analysis": parsed}
 
 
+
+
+
 def get_plot_candidates(state: State) -> list:
     payload = state.get("raw_input") or {}
     analysis = state.get("analysis") or {}
@@ -379,6 +398,10 @@ def get_plot_candidates(state: State) -> list:
     return uniq_candidates
 
 
+
+
+
+
 def extract_and_merge_series(candidates: list) -> list:
 
     series_found = []
@@ -388,9 +411,7 @@ def extract_and_merge_series(candidates: list) -> list:
             logger.debug("generate_plots: candidate[%d] -> %d series", idx, len(s))
             series_found.extend(s)
         except Exception as e:
-            logger.exception(
-                "generate_plots: extract_time_series failed on candidate[%d]: %s", idx, e
-            )
+            logger.exception("generate_plots: extract_time_series failed on candidate[%d]: %s", idx, e)
     merged = []
     seen_keys = set()
     for s in series_found:
@@ -414,6 +435,9 @@ def extract_and_merge_series(candidates: list) -> list:
     return merged
 
 
+
+
+
 def create_plots(series: list) -> list:
     plots = []
     for s in series:
@@ -432,6 +456,8 @@ def create_plots(series: list) -> list:
             continue
     return plots
 
+
+
 # generate plots node
 def generate_plots(state: State) -> dict:
     logger.debug("generate_plots: start")
@@ -446,6 +472,9 @@ def generate_plots(state: State) -> dict:
         len(candidates),
     )
     return {"analysis": state["analysis"]}
+
+
+
 
 # format output node
 def format_output(state: State) -> dict:
@@ -467,6 +496,11 @@ def format_output(state: State) -> dict:
     state["output"] = out
     logger.debug("format_output: done with keys=%s", list(out.keys()))
     return {"output": out}
+
+
+
+
+
 
 # run_graph() function to run the graph
 def run_graph(graph, payload: dict):
