@@ -95,8 +95,7 @@ def extract_json_from_text(text: str):
             if "\n" in block:
                 first_line, rest = block.split("\n", 1)
                 lang = first_line.strip().lower()
-                candidate = rest if lang in (
-                    "json", "javascript", "js") else block
+                candidate = rest if lang in ("json") else block
             else:
                 candidate = block
             candidate = candidate.strip()
