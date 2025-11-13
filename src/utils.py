@@ -23,7 +23,6 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
-# State Cladss for LangGraph
 class State(TypedDict):
     messages: Annotated[list, add_messages]
     raw_input: dict
@@ -112,6 +111,7 @@ def parse_time_series_from_payload(payload: Any) -> List[Dict[str, Any]]:
                 times.append(t)
                 values.append(v)
             series_found.append({"name": f"cpu_{range_name}", "times": times, "values": values})
+
     if "timestamps" in payload and "values" in payload:
         ts = payload.get("timestamps", [])
         vs = payload.get("values", [])
@@ -122,6 +122,7 @@ def parse_time_series_from_payload(payload: Any) -> List[Dict[str, Any]]:
             except (ValueError, TypeError):
                 values = [None for v in vs]
             series_found.append({"name": "series", "times": times, "values": values})
+            
     if "metrics" in payload:
         for metric in payload["metrics"]:
             points = metric.get("points") or metric.get("data") or metric.get("values")
@@ -139,7 +140,7 @@ def parse_time_series_from_payload(payload: Any) -> List[Dict[str, Any]]:
                 name = metric.get("name") or metric.get("metric") or "metric"
                 series_found.append({"name": name, "times": times, "values": values})
     cleaned = []
-    for series in series:
+    for series in series_found:
         valid_points = [(t, v) for t, v in zip(series.get("times", []), series.get("values", [])) if t is not None and v is not None]
         if len(valid_points) >= 2:
             times, values = zip(*valid_points)
@@ -162,7 +163,6 @@ def convert_timeseries_to_base64_plot(times: List[datetime], values: List[float]
     b64 = base64.b64encode(buf.read()).decode("ascii")
     return f"data:image/png;base64,{b64}"
 
-# parse input node
 def parse_input(state: State) -> dict:    
     logger.debug("parse_input: start")
     raw = state.get("raw_input") or {}
@@ -185,7 +185,6 @@ def parse_input(state: State) -> dict:
         logger.debug("parse_input: parsed payload (keys unavailable)")
     return {"raw_input": state["raw_input"]}
 
-# analyze with LLM node
 def analyze_with_llm(state: State) -> dict:
     logger.debug("analyze_with_llm: start")
     payload = state.get("raw_input", {})
@@ -291,7 +290,6 @@ def render_plots_as_base64(series: list) -> list:
             continue
     return plots
 
-# generate plots node
 def generate_plots(state: State) -> dict:
     logger.debug("generate_plots: start")
     potential_data_sources = gather_plotting_data_sources(state)
@@ -306,7 +304,6 @@ def generate_plots(state: State) -> dict:
     )
     return {"analysis": state["analysis"]}
 
-# format output node
 def format_output(state: State) -> dict:
     logger.debug("format_output: start")
     analysis = state.get("analysis", {})
@@ -327,7 +324,6 @@ def format_output(state: State) -> dict:
     logger.debug("format_output: done with keys=%s", list(out.keys()))
     return {"output": out}
 
-# run_graph() function to run the graph
 def run_graph(graph, payload: dict):
     logger.info("run_graph: received payload with keys=%s", list(payload.keys()))
     initial_state = {

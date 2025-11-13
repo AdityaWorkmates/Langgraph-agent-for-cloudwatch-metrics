@@ -1,4 +1,3 @@
-
 import os
 from dotenv import load_dotenv
 
@@ -19,8 +18,6 @@ os.environ["LANGSMITH_API_KEY"] = os.getenv("LANGSMITH_API_KEY")
 os.environ["LANGSMITH_PROJECT"] = os.getenv("LANGSMITH_PROJECT")
 os.environ["LANGSMITH_ENDPOINT"] = os.getenv("LANGSMITH_ENDPOINT")
 os.environ["LANGCHAIN_TRACING_V2"] = os.getenv("LANGCHAIN_TRACING_V2") or ("true" if os.getenv("LANGCHAIN_API_KEY") else None)
-
-
 
 SYSTEM_PROMPT = '''
 You are a cloud reliability assistant. You will be given an input JSON payload containing monitoring, metrics, or alarm information.

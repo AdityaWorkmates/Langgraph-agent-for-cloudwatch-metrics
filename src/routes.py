@@ -2,13 +2,10 @@ from flasgger import swag_from
 import json
 import logging
 import time
-
 from flask import request, jsonify, Blueprint
 from flask_cors import CORS
-
 from werkzeug.utils import secure_filename
 from langgraph.graph import StateGraph, START, END
-
 from src.utils import (
     State,
     parse_input,
@@ -22,14 +19,6 @@ from src.config import MODEL_ID
 logger = logging.getLogger(__name__)
 
 main_routes = Blueprint('main_routes', __name__)
-
-
-
-
-
-
-
-
 
 graph_builder = StateGraph(State)
 
@@ -46,20 +35,8 @@ graph_builder.add_edge("format_output", END)
 
 graph = graph_builder.compile()
 
-
-
-
-
-
-
 @main_routes.route('/health', methods=['GET'])
 def health():
-    """Health check endpoint.
-    ---
-    responses:
-      200:
-        description: The application is healthy.
-    """
     logger.info("Health check requested")
     response = jsonify({"status": "ok", "model_id": MODEL_ID})
     logger.info(f"Health check response: {response.get_data(as_text=True)}")
@@ -67,27 +44,6 @@ def health():
 
 @main_routes.route('/analyze', methods=['POST'])
 def analyze():
-    """Analyzes the given payload.
-    ---
-    parameters:
-      - name: file
-        in: formData
-        type: file
-        required: false
-        description: The JSON file to analyze.
-      - name: body
-        in: body
-        required: false
-        schema:
-          type: object
-    responses:
-      200:
-        description: The analysis was successful.
-      400:
-        description: The request was invalid.
-      500:
-        description: An error occurred during the analysis.
-    """
     req_id = getattr(request, "environ", {}).get("REQUEST_ID") or str(int(time.time() * 1000))
     logger.info(f"Analyze request {req_id} received")
     logger.info(f"Request headers: {request.headers}")
