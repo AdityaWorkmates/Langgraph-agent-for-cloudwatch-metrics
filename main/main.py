@@ -61,10 +61,6 @@ RESPONSE_SCHEMA:
 '''
 
 def parse_input(state: State) -> dict:
-    """
-    Accepts state['messages'] or state['raw_input'] and normalizes into raw_input (dict).
-    If messages contains JSON string, parse it.
-    """
     raw = state.get("raw_input") or {}
     if not raw and state.get("messages"):
         last = state["messages"][-1]
@@ -81,10 +77,6 @@ def parse_input(state: State) -> dict:
     return {"raw_input": state["raw_input"]}
 
 def analyze_with_llm(state: State) -> dict:
-    """
-    Calls the Bedrock LLM with the system prompt and the raw_input.
-    Stores the LLM response parsed as JSON into state['analysis'].
-    """
     payload = state["raw_input"]
     user_content = f"Input payload (JSON):\n{json.dumps(payload, indent=2)}\n\nPlease follow the system instructions and produce the RESPONSE_SCHEMA JSON."
     messages = [
@@ -113,10 +105,6 @@ def analyze_with_llm(state: State) -> dict:
 
 
 def format_output(state: State) -> dict:
-    """
-    Validates & canonicalizes the analysis into a final 'output' dict the consumer will get.
-    If the LLM analysis misses fields, fill default structure.
-    """
     analysis = state.get("analysis", {})
     out = {
         "summary": analysis.get("summary", "No summary provided."),
@@ -142,9 +130,6 @@ graph_builder.add_edge("format_output", END)
 graph = graph_builder.compile()
 
 def run_analysis(payload: dict) -> dict:
-    """
-    Run the LangGraph with a JSON payload and return the structured output.
-    """
     initial_state = {
         "messages": [{"role": "user", "content": json.dumps(payload)}],
         "raw_input": payload
