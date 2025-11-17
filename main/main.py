@@ -17,7 +17,7 @@ class State(TypedDict):
 graph_builder = StateGraph(State)
 
 MODEL_PROVIDER = "bedrock_converse"
-MODEL_ID = os.getenv("BEDROCK_MODEL_ID", "<REPLACE_WITH_BEDROCK_MODEL_ID>")
+MODEL_ID = os.getenv("BEDROCK_MODEL_ID")
 REGION_NAME = os.getenv("AWS_REGION", "us-west-2")
 
 llm = init_chat_model(
